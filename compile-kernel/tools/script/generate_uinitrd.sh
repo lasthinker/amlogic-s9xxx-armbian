@@ -5,11 +5,11 @@
 # warranty of any kind, whether express or implied.
 #
 # This file is a part of the Armbian Rebuild and kernel Recompile script
-# https://github.com/ophub/amlogic-s9xxx-armbian
 #
 # Description: Run on Ubuntu-20.04-x86_64, Compile the kernel for Amlogic s9xxx tv box
-# Copyright (C) 2021- https://github.com/unifreq
-# Copyright (C) 2021- https://github.com/ophub/amlogic-s9xxx-armbian
+#
+# Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
+#
 #======================================================================================
 
 #===== Do not modify the following parameter settings, Start =====

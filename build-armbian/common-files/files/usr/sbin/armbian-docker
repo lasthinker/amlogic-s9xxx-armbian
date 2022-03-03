@@ -5,11 +5,10 @@
 # warranty of any kind, whether express or implied.
 #
 # This file is a part of the Armbian Rebuild and kernel Recompile script
-# https://github.com/ophub/amlogic-s9xxx-armbian
 #
 # Function: Install docker to armbian
-# Copyright (C) 2021 https://github.com/unifreq/openwrt_packit
-# Copyright (C) 2021 https://github.com/ophub/amlogic-s9xxx-armbian
+#
+# Copyright (C) 2021 https://github.com/lasthinker/amlogic-s9xxx-armbian
 #
 # Command: armbian-docker
 #=========================================================================
@@ -27,12 +26,12 @@ SUCCESS="[${green_font_prefix}SUCCESS${font_color_suffix}]"
 OPT="[${yellow_font_prefix}OPT${font_color_suffix}]"
 ERROR="[${red_font_prefix}ERROR${font_color_suffix}]"
 # Get custom firmware information
-ophub_release_file="/etc/ophub-release"
+lasthinker_release_file="/etc/lasthinker-release"
 
 echo -e "${INFO} Welcome to docker installation tool."
 
 # Get version info
-source ${ophub_release_file}
+source ${lasthinker_release_file}
 VERSION_CODEID="${VERSION_CODEID}"     #ubuntu  -  debian
 VERSION_CODENAME="${VERSION_CODENAME}" #focal   -  bullseye/buster
 if [[ -z "${VERSION_CODEID}" ]]; then

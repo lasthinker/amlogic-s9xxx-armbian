@@ -1,5 +1,5 @@
-name: "Rebuild armbian and kernel for Amlogic s9xxx tv box"
-author: "https://github.com/ophub"
+name: "Rebuild armbian and kernel for Amlogic S905X"
+author: "https://github.com/lasthinker"
 description: "Support Amlogic s9xxx tv box are s922x, s905x3, s905x2, s912, s905d, s905x, s905w, s905, etc."
 inputs:
   # Choose build target
@@ -11,11 +11,11 @@ inputs:
   armbian_soc:
     description: "Set Amlogic SoC."
     required: false
-    default: "s905d_s905x3"
+    default: "s905x"
   armbian_kernel:
     description: "Set kernel."
     required: false
-    default: "5.15.25_5.4.180"
+    default: "5.15.25"
   version_branch:
     description: "Set kernel."
     required: false
@@ -36,11 +36,11 @@ inputs:
   kernel_repo:
     description: "select kernel repository"
     required: false
-    default: "unifreq"
+    default: "lasthinker"
   kernel_version:
     description: "select kernel version"
     required: false
-    default: "5.15.25_5.4.180"
+    default: "5.15.25"
   kernel_auto:
     description: "Auto use the latest kernel"
     required: false
@@ -48,7 +48,7 @@ inputs:
   kernel_sign:
     description: "Set the kernel custom signature"
     required: false
-    default: "-meson64-dev"
+    default: "-lasthinker"
   kernel_config:
     description: "Set the path of kernel .config"
     required: false

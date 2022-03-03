@@ -5,32 +5,31 @@
 # warranty of any kind, whether express or implied.
 #
 # This file is a part of the Armbian Rebuild and kernel Recompile script
-# https://github.com/ophub/amlogic-s9xxx-armbian
 #
 # Function: Armbian kernel update
-# Copyright (C) 2021 https://github.com/unifreq/openwrt_packit
-# Copyright (C) 2021 https://github.com/ophub/amlogic-s9xxx-armbian
 #
-# Kernel download server: https://github.com/ophub/kernel/tree/main/pub
+# Copyright (C) 2021 https://github.com/lasthinker/amlogic-s9xxx-armbian
+#
+# Kernel download server: https://github.com/lasthinker/kernel/tree/main/pub
 #
 # When the kernel version is upgraded from 5.10 or lower to 5.10 or higher, need to install mainline u-boot.
 # When there is no mainline u-boot file in related directory, the script will auto try to download the file from the server:
-# UBOOT_OVERLOAD: https://github.com/ophub/amlogic-s9xxx-armbian/tree/main/build-armbian/amlogic-u-boot/overload
-# MAINLINE_UBOOT: https://github.com/ophub/amlogic-s9xxx-armbian/tree/main/build-armbian/amlogic-u-boot/bootloader
+# UBOOT_OVERLOAD: https://github.com/lasthinker/amlogic-s9xxx-armbian/tree/main/build-armbian/amlogic-u-boot/overload
+# MAINLINE_UBOOT: https://github.com/lasthinker/amlogic-s9xxx-armbian/tree/main/build-armbian/amlogic-u-boot/bootloader
 #
 # Command: armbian-update
 # Command optional parameters: armbian-update <kernel_version> <version_branch> <mainline_u-boot>
 # The kernel above version 5.10 needs to install mainline u-boot
 # The mainline u-boot is installed by default: armbian-update
-# Don't write mainline u-boot command: armbian-update 5.4.170 stable no
+# Don't write mainline u-boot command: armbian-update 5.4.180 stable no
 #============================================================================================================================
 
 # Set default value
 tmp_path="${PWD}"
-kernel_repo="https://api.github.com/repos/ophub/kernel/contents/pub"
-depends_repo="https://raw.githubusercontent.com/ophub/amlogic-s9xxx-armbian/main/build-armbian/amlogic-u-boot"
-ophub_release_file="/etc/ophub-release"
-old_ophub_release_file="/etc/armbian-aml-release"
+kernel_repo="https://api.github.com/repos/lasthinker/kernel/contents/pub"
+depends_repo="https://raw.githubusercontent.com/lasthinker/amlogic-s9xxx-armbian/main/build-armbian/amlogic-u-boot"
+lasthinker_release_file="/etc/lasthinker-release"
+old_lasthinker_release_file="/etc/armbian-aml-release"
 github_api_kernel_files="${tmp_path}/github_api_kernel_files"
 
 echo -e "Ready to update, please wait..."
@@ -42,14 +41,14 @@ error_msg() {
 }
 
 # Check release file
-[ -f "${old_ophub_release_file}" ] && mv -f "${old_ophub_release_file}" "${ophub_release_file}" 2>/dev/null && sync
-if [ -f "${ophub_release_file}" ]; then
-    source "${ophub_release_file}" 2>/dev/null
+[ -f "${old_lasthinker_release_file}" ] && mv -f "${old_lasthinker_release_file}" "${lasthinker_release_file}" 2>/dev/null && sync
+if [ -f "${lasthinker_release_file}" ]; then
+    source "${lasthinker_release_file}" 2>/dev/null
     UBOOT_OVERLOAD="${UBOOT_OVERLOAD}"
     MAINLINE_UBOOT="${MAINLINE_UBOOT}"
     ANDROID_UBOOT="${ANDROID_UBOOT}"
 else
-    error_msg "${ophub_release_file} file is missing!"
+    error_msg "${lasthinker_release_file} file is missing!"
 fi
 
 # Find the partition where root is located
@@ -386,10 +385,10 @@ fi
 rm -f ${tmp_path}/*${custom_kernel_name}*.tar.gz 2>/dev/null
 
 # 06. Update
-sed -i '/KERNEL_VERSION/d' ${ophub_release_file} 2>/dev/null
-echo "KERNEL_VERSION='${kernel_version}'" >>${ophub_release_file} 2>/dev/null
-sed -i '/K510/d' ${ophub_release_file} 2>/dev/null
-echo "K510='${K510}'" >>${ophub_release_file} 2>/dev/null
+sed -i '/KERNEL_VERSION/d' ${lasthinker_release_file} 2>/dev/null
+echo "KERNEL_VERSION='${kernel_version}'" >>${lasthinker_release_file} 2>/dev/null
+sed -i '/K510/d' ${lasthinker_release_file} 2>/dev/null
+echo "K510='${K510}'" >>${lasthinker_release_file} 2>/dev/null
 
 sync
 wait

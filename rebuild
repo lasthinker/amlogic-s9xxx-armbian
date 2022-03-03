@@ -6,11 +6,10 @@
 # warranty of any kind, whether express or implied.
 #
 # This file is a part of the Armbian Rebuild and kernel Recompile script
-# https://github.com/ophub/amlogic-s9xxx-armbian
 #
 # Description: Run on Ubuntu-20.04-x86_64, Build armbian for Amlogic s9xxx tv box
-# Copyright (C) 2021- https://github.com/unifreq
-# Copyright (C) 2021- https://github.com/ophub/amlogic-s9xxx-armbian
+#
+# Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
 #
 #========= Install the basic packages of rebuild armbian for Ubuntu 20.04 =========
 #
@@ -56,15 +55,15 @@ tmp_outpath="${tmp_dir}/tmp_out"
 tmp_armbian="${tmp_dir}/tmp_armbian"
 tmp_build="${tmp_dir}/tmp_build"
 tmp_aml_image="${tmp_dir}/tmp_aml_image"
-os_release_file="etc/os-release"           # Get armbian ${VERSION_CODENAME}: such as [ focal ]
-armbian_release_file="etc/armbian-release" # Set banner's ${BOARD_NAME}: such as [ s905x3 ]
-ophub_release_file="etc/ophub-release"     # Add custom armbian firmware information
-build_armbian=("a311d" "s922x" "s922x-n2" "s922x-reva" "s905x3" "s905x2" "s905x2-km3" "s912" "s912-t95z" "s905d" "s905d-ki" "s905x" "s905w" "s905")
+os_release_file="etc/os-release"           # Get armbian ${VERSION_CODENAME}: such as [ bullseye ]
+armbian_release_file="etc/armbian-release" # Set banner's ${BOARD_NAME}: such as [ s905x ]
+lasthinker_release_file="etc/lasthinker-release"     # Add custom armbian firmware information
+build_armbian=("s905x")
 #
 # Latest kernel download repository
-kernel_repo="https://github.com/ophub/kernel/tree/main/pub"
+kernel_repo="https://github.com/lasthinker/kernel/tree/main/pub"
 version_branch="stable"
-build_kernel=("5.15.25" "5.4.180")
+build_kernel=("5.15.25")
 auto_kernel="true"
 #
 # Set Armbian firmware size (BOOT_MB >= 256, ROOT_MB >= 2000)
@@ -263,6 +262,12 @@ confirm_version() {
         MAINLINE_UBOOT="x96max-u-boot.bin.sd.bin"
         ANDROID_UBOOT=""
         ;;
+    s905l3a | e900v22c | e900v22d)
+        FDTFILE="meson-g12a-u200.dtb"
+        UBOOT_OVERLOAD="u-boot-u200.bin"
+        MAINLINE_UBOOT=""
+        ANDROID_UBOOT=""
+        ;;
     s905x | hg680p | b860h)
         FDTFILE="meson-gxl-s905x-p212.dtb"
         UBOOT_OVERLOAD="u-boot-p212.bin"
@@ -288,8 +293,9 @@ confirm_version() {
         ANDROID_UBOOT=""
         ;;
     s905 | beelinkminimx | mxqpro+)
-        FDTFILE="meson-gxbb-vega-s95-telos.dtb"
+        FDTFILE="meson-gxbb-beelink-mini-mx.dtb"
         #FDTFILE="meson-gxbb-mxq-pro-plus.dtb"
+        #FDTFILE="meson-gxbb-vega-s95-telos.dtb"
         UBOOT_OVERLOAD="u-boot-s905.bin"
         #UBOOT_OVERLOAD="u-boot-p201.bin"
         MAINLINE_UBOOT=""
@@ -313,7 +319,7 @@ confirm_version() {
         MAINLINE_UBOOT="gtkingpro-u-boot.bin.sd.bin"
         ANDROID_UBOOT=""
         ;;
-    s922x-n2 | odroid-n2 | n2)
+    s922x-n2 | odroid-n2)
         FDTFILE="meson-g12b-odroid-n2.dtb"
         UBOOT_OVERLOAD="u-boot-gtkingpro.bin"
         MAINLINE_UBOOT="odroid-n2-u-boot.bin.sd.bin"
@@ -325,7 +331,7 @@ confirm_version() {
         MAINLINE_UBOOT=""
         ANDROID_UBOOT=""
         ;;
-    a311d | khadas-vim3 | vim3)
+    a311d | khadas-vim3)
         FDTFILE="meson-g12b-a311d-khadas-vim3.dtb"
         UBOOT_OVERLOAD="u-boot-gtkingpro.bin"
         MAINLINE_UBOOT="khadas-vim3-u-boot.sd.bin"
@@ -492,20 +498,20 @@ refactor_files() {
     ln -sf /usr/lib lib
     ln -sf /usr/sbin sbin
     ln -sf /var/tmp tmp
-    ln -sf /usr/share/zoneinfo/Asia/Shanghai etc/localtime
+    ln -sf /usr/share/zoneinfo/Asia/Jakarta etc/localtime
     ln -sf /usr/sbin/armbian-ddbr usr/sbin/ddbr
 
     # Add custom firmware information
-    echo "VERSION_CODEID='${release_codeid}'" >>${ophub_release_file} 2>/dev/null
-    echo "VERSION_CODENAME='${release_codename}'" >>${ophub_release_file} 2>/dev/null
-    echo "FDTFILE='${FDTFILE}'" >>${ophub_release_file} 2>/dev/null
-    echo "UBOOT_OVERLOAD='${UBOOT_OVERLOAD}'" >>${ophub_release_file} 2>/dev/null
-    echo "MAINLINE_UBOOT='/usr/lib/u-boot/${MAINLINE_UBOOT}'" >>${ophub_release_file} 2>/dev/null
-    echo "ANDROID_UBOOT='/usr/lib/u-boot/${ANDROID_UBOOT}'" >>${ophub_release_file} 2>/dev/null
-    echo "KERNEL_VERSION='${kernel}'" >>${ophub_release_file} 2>/dev/null
-    echo "SOC='${soc}'" >>${ophub_release_file} 2>/dev/null
-    echo "K510='${K510}'" >>${ophub_release_file} 2>/dev/null
-    echo "PACKAGED_DATE='$(date +%Y-%m-%d)'" >>${ophub_release_file} 2>/dev/null
+    echo "VERSION_CODEID='${release_codeid}'" >>${lasthinker_release_file} 2>/dev/null
+    echo "VERSION_CODENAME='${release_codename}'" >>${lasthinker_release_file} 2>/dev/null
+    echo "FDTFILE='${FDTFILE}'" >>${lasthinker_release_file} 2>/dev/null
+    echo "UBOOT_OVERLOAD='${UBOOT_OVERLOAD}'" >>${lasthinker_release_file} 2>/dev/null
+    echo "MAINLINE_UBOOT='/usr/lib/u-boot/${MAINLINE_UBOOT}'" >>${lasthinker_release_file} 2>/dev/null
+    echo "ANDROID_UBOOT='/usr/lib/u-boot/${ANDROID_UBOOT}'" >>${lasthinker_release_file} 2>/dev/null
+    echo "KERNEL_VERSION='${kernel}'" >>${lasthinker_release_file} 2>/dev/null
+    echo "SOC='${soc}'" >>${lasthinker_release_file} 2>/dev/null
+    echo "K510='${K510}'" >>${lasthinker_release_file} 2>/dev/null
+    echo "PACKAGED_DATE='$(date +%Y-%m-%d)'" >>${lasthinker_release_file} 2>/dev/null
 
     # Edit the etc/fstab
     [ -f "etc/fstab" ] || error_msg "The etc/fstab File does not exist."
@@ -557,7 +563,7 @@ make_image() {
     cd ${make_path}
 
     # Make Amlogic s9xxx armbian
-    build_image_file="${tmp_outpath}/Armbian_${armbian_rebuild_version}_Aml_${soc}_focal_${kernel}_$(date +"%Y.%m.%d.%H%M").img"
+    build_image_file="${tmp_outpath}/Armbian_${armbian_rebuild_version}_Aml_${soc}_bullseye_${kernel}_$(date +"%Y.%m.%d.%H%M").img"
     rm -f ${build_image_file} 2>/dev/null && sync
 
     IMG_SIZE=$((SKIP_MB + BOOT_MB + ROOT_MB))
@@ -626,7 +632,7 @@ clean_tmp() {
     cd ${tmp_outpath}
 
     # Rename version
-    [[ "${release_codename}" != "focal" ]] && rename "s/focal/${release_codename}/g" *.img 2>/dev/null && sync
+    [[ "${release_codename}" != "bullseye" ]] && rename "s/bullseye/${release_codename}/g" *.img 2>/dev/null && sync
     gzip *.img && sync && mv -f *.img.gz ${armbian_outputpath}
     sync
 
@@ -676,7 +682,7 @@ loop_rebuild() {
 }
 
 # Show welcome message
-echo -e "Welcome to Rebuild Armbian for Amlogic s9xxx tv box!"
+echo -e "Welcome to Rebuild Armbian for Amlogic S905X"
 [ $(id -u) = 0 ] || error_msg "please run this script as root: [ sudo ./$0 ]"
 # Show server start information
 echo -e "Server CPU configuration information: \n$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"

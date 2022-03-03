@@ -6,11 +6,10 @@
 # warranty of any kind, whether express or implied.
 #
 # This file is a part of the Armbian Rebuild and kernel Recompile script
-# https://github.com/ophub/amlogic-s9xxx-armbian
 #
 # Description: Run on Ubuntu-20.04-x86_64, Compile the kernel for Amlogic s9xxx tv box
-# Copyright (C) 2021- https://github.com/unifreq
-# Copyright (C) 2021- https://github.com/ophub/amlogic-s9xxx-armbian
+#
+# Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
 #
 #============= Install the basic packages of compile the kernel for Ubuntu 20.04 ==============
 #
@@ -59,11 +58,11 @@ toolchain_path="/usr/local/toolchain"
 # When set to [ -r kernel.org ], Kernel download from kernel.org
 kernel_org_repo="https://cdn.kernel.org/pub/linux/kernel/v5.x/"
 # Set the default for downloading kernel sources from github.com
-repo_owner="unifreq"
+repo_owner="lasthinker"
 repo_branch="main"
-build_kernel=("5.4.180" "5.15.25")
+build_kernel=("5.15.25")
 auto_kernel="true"
-custom_name="-meson64-dev"
+custom_name="-lasthinker"
 #
 # Cross compile toolchain download mirror, run on ubuntu-20.04
 dev_repo="https://github.com/ophub/script/releases/download/dev"
