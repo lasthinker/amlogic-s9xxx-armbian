@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 5.4.181 Kernel Configuration
+# Linux/arm64 5.4.182 Kernel Configuration
 #
 
 #
@@ -2497,8 +2497,8 @@ CONFIG_NET_VENDOR_QUALCOMM=y
 # CONFIG_QCA7000_UART is not set
 # CONFIG_QCOM_EMAC is not set
 CONFIG_SFE_SUPPORT_IPV6=y
-CONFIG_SFE_ECM=y
 CONFIG_FAST_CLASSIFIER=y
+CONFIG_SFE_ECM=y
 # CONFIG_RMNET is not set
 # CONFIG_NET_VENDOR_RDC is not set
 # CONFIG_NET_VENDOR_REALTEK is not set
