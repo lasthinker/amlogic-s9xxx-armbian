@@ -60,7 +60,7 @@ kernel_org_repo="https://cdn.kernel.org/pub/linux/kernel/v5.x/"
 # Set the default for downloading kernel sources from github.com
 repo_owner="lasthinker"
 repo_branch="main"
-build_kernel=("5.4.180")
+build_kernel=("5.15.25")
 auto_kernel="true"
 custom_name="-lasthinker"
 #

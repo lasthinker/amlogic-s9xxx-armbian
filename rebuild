@@ -63,7 +63,7 @@ build_armbian=("s905x")
 # Latest kernel download repository
 kernel_repo="https://github.com/lasthinker/kernel/tree/main/pub"
 version_branch="stable"
-build_kernel=("5.4.180")
+build_kernel=("5.15.25")
 auto_kernel="true"
 #
 # Set Armbian firmware size (BOOT_MB >= 256, ROOT_MB >= 2000)
