@@ -12,7 +12,7 @@ on:
       sel_tags_keywords:
         description: "RELEASE: focal / bullseye / buster"
         required: false
-        default: "bullseye"
+        default: "focal"
       more_settings:
         description: "Rebuild: More parameter settings"
         required: false
@@ -87,7 +87,7 @@ jobs:
           allowUpdates: true
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
-            This is Armbian image for Amlogic S905X STB
+            This is Armbian image for Amlogic S905X
             * Firmware information
             Default username: root
             Default password: 1234

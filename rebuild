@@ -563,7 +563,7 @@ make_image() {
     cd ${make_path}
 
     # Make Amlogic s9xxx armbian
-    build_image_file="${tmp_outpath}/Armbian_${armbian_rebuild_version}_Aml_${soc}_bullseye_${kernel}_$(date +"%Y.%m.%d.%H%M").img"
+    build_image_file="${tmp_outpath}/Armbian_${armbian_rebuild_version}_Aml_${soc}_focal_${kernel}_$(date +"%Y.%m.%d.%H%M").img"
     rm -f ${build_image_file} 2>/dev/null && sync
 
     IMG_SIZE=$((SKIP_MB + BOOT_MB + ROOT_MB))
@@ -632,7 +632,7 @@ clean_tmp() {
     cd ${tmp_outpath}
 
     # Rename version
-    [[ "${release_codename}" != "bullseye" ]] && rename "s/bullseye/${release_codename}/g" *.img 2>/dev/null && sync
+    [[ "${release_codename}" != "focal" ]] && rename "s/focal/${release_codename}/g" *.img 2>/dev/null && sync
     gzip *.img && sync && mv -f *.img.gz ${armbian_outputpath}
     sync
 
