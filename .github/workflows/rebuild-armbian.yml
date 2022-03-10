@@ -73,7 +73,7 @@ jobs:
         with:
           armbian_path: ${{ env.ARMBIAN_URL }}
           armbian_soc: s905x
-          armbian_kernel: 5.15.25
+          armbian_kernel: 5.15.25_5.10.100
 
       - name: Upload Armbian image to Release
         id: release
