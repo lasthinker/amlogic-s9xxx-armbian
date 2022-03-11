@@ -63,7 +63,7 @@ build_armbian=("s905x")
 # Latest kernel download repository
 kernel_repo="https://github.com/lasthinker/kernel/tree/main/pub"
 version_branch="stable"
-build_kernel=("5.15.25_5.10.100")
+build_kernel=("5.15.25")
 auto_kernel="true"
 #
 # Set Armbian firmware size (BOOT_MB >= 256, ROOT_MB >= 2000)
@@ -520,8 +520,8 @@ refactor_files() {
     # Custom banner name
     sed -i "s|BOARD_NAME=.*|BOARD_NAME=\"Aml ${soc}\"|g" ${armbian_release_file} 2>/dev/null
 
-    # Make the .bashrc take effect
-    echo '[ -f "${HOME}/.bashrc" ] && . ${HOME}/.bashrc' >>etc/profile
+    # Make the .bashrc take effect, Default shell settings file: /etc/default/useradd
+    echo '[[ "${SHELL}" == *bash && -f "${HOME}/.bashrc" ]] && . ${HOME}/.bashrc' >>etc/profile
 
     # Add tasks that need to be executed on initial startup
     armbian_firstrun="usr/lib/armbian/armbian-firstrun"
