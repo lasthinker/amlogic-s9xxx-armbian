@@ -65,10 +65,15 @@ else
 fi
 echo "K510: [ ${K510} ]"
 
-# generate uuid
+#Get the current UUID, such as [ UUID=dc20e16b-1234-5678-a636-7945a906d0c6 ]
+CURRENT_ROOTFS_UUID="$(sed -e 's/^.*root=//' -e 's/ .*$//' </proc/cmdline)"
+[ -z "${CURRENT_ROOTFS_UUID}" ] && echo "The current UUID is invalid, cannot continue." && exit 1
+echo "CURRENT_ROOTFS_UUID: ${CURRENT_ROOTFS_UUID}"
+#
+# Generate New ROOTFS UUID
 ROOTFS_UUID="$(cat /proc/sys/kernel/random/uuid)"
 [ -z "${ROOTFS_UUID}" ] && ROOTFS_UUID="$(uuidgen)"
-[ -z "${ROOTFS_UUID}" ] && echo "The uuidgen is invalid, cannot continue." && exit 1
+[ -z "${ROOTFS_UUID}" ] && echo "The new UUID is invalid, cannot continue." && exit 1
 echo "ROOTFS_UUID: ${ROOTFS_UUID}"
 
 # Set model list, begin ------------
@@ -165,6 +170,7 @@ else
 fi
 # Set model list, end ------------
 
+echo -e "Input ID: [ ${boxtype} ]"
 echo -e "FDTFILE: [ ${FDTFILE} ]"
 echo -e "UBOOT_OVERLOAD: [ ${UBOOT_OVERLOAD} ]"
 
@@ -263,14 +269,21 @@ echo "Start copy BOOT_EMMC partition data..."
 cp -rf /boot/* ${DIR_INSTALL} && sync
 rm -rf ${DIR_INSTALL}/'System Volume Information' 2>/dev/null
 
-echo "Generate the new uEnv.txt file."
-rm -f ${DIR_INSTALL}/uEnv.txt 2>/dev/null && sync
-cat >${DIR_INSTALL}/uEnv.txt <<EOF
-LINUX=/zImage
-INITRD=/uInitrd
-FDT=/dtb/amlogic/${FDTFILE}
-APPEND=root=UUID=${ROOTFS_UUID} rootfstype=btrfs rootflags=compress=zstd:6 console=ttyAML0,115200n8 console=tty0 no_console_suspend consoleblank=0 fsck.fix=yes fsck.repair=yes net.ifnames=0 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory swapaccount=1
-EOF
+# Edit the uEnv.txt (s912-t95z-plus is /boot/extlinux/extlinux.conf)
+if [[ "${FDTFILE}" == "meson-gxm-t95z-plus.dtb" ]]; then
+    boot_conf_file="extlinux/extlinux.conf"
+else
+    boot_conf_file="uEnv.txt"
+fi
+echo -e "The boot file is [ ${boot_conf_file} ]"
+#
+if [[ -f "${DIR_INSTALL}/${boot_conf_file}" ]]; then
+    sed -i "s|${CURRENT_ROOTFS_UUID}|UUID=${ROOTFS_UUID}|g" ${DIR_INSTALL}/${boot_conf_file}
+    sed -i "s|meson.*.dtb|${FDTFILE}|g" ${DIR_INSTALL}/${boot_conf_file}
+else
+    echo "The boot file [ ${boot_conf_file} ] does not exist."
+    exit 1
+fi
 
 rm ${DIR_INSTALL}/s9*
 rm ${DIR_INSTALL}/aml*
@@ -334,6 +347,10 @@ ln -sf /var/tmp ${DIR_INSTALL}/tmp
 sync
 echo "Copy complete."
 
+echo "Edit the etc/fstab file."
+sed -i "s|${CURRENT_ROOTFS_UUID}|UUID=${ROOTFS_UUID}|g" ${DIR_INSTALL}/etc/fstab
+sed -i "s|LABEL=BOOT|LABEL=BOOT_EMMC|g" ${DIR_INSTALL}/etc/fstab
+
 echo "Update the relevant parameters"
 lasthinker_release_file="${DIR_INSTALL}/etc/lasthinker-release"
 #
@@ -355,15 +372,6 @@ echo "MYBOX_UBOOT='${MYBOX_UBOOT}'" >>${lasthinker_release_file} 2>/dev/null
 sed -i '/SOC/d' ${lasthinker_release_file} 2>/dev/null
 echo "SOC='${AMLOGIC_SOC}'" >>${lasthinker_release_file} 2>/dev/null
 sync
-
-echo "Generate the new fstab file."
-rm -f ${DIR_INSTALL}/etc/fstab 2>/dev/null && sync
-cat >${DIR_INSTALL}/etc/fstab <<EOF
-UUID=${ROOTFS_UUID}       /          btrfs       compress-force=zstd:6      0 1
-LABEL=BOOT_EMMC           /boot      vfat        defaults                   0 2
-tmpfs                     /tmp       tmpfs       defaults,nosuid            0 0
-
-EOF
 
 rm -f ${DIR_INSTALL}/usr/sbin/armbian-tf 2>/dev/null
 sync
