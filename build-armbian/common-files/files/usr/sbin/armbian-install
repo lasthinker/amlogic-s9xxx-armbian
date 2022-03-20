@@ -65,11 +65,6 @@ else
 fi
 echo "K510: [ ${K510} ]"
 
-#Get the current UUID, such as [ UUID=dc20e16b-1234-5678-a636-7945a906d0c6 ]
-CURRENT_ROOTFS_UUID="$(sed -e 's/^.*root=//' -e 's/ .*$//' </proc/cmdline)"
-[ -z "${CURRENT_ROOTFS_UUID}" ] && echo "The current UUID is invalid, cannot continue." && exit 1
-echo "CURRENT_ROOTFS_UUID: ${CURRENT_ROOTFS_UUID}"
-#
 # Generate New ROOTFS UUID
 ROOTFS_UUID="$(cat /proc/sys/kernel/random/uuid)"
 [ -z "${ROOTFS_UUID}" ] && ROOTFS_UUID="$(uuidgen)"
@@ -270,12 +265,17 @@ cp -rf /boot/* ${DIR_INSTALL} && sync
 rm -rf ${DIR_INSTALL}/'System Volume Information' 2>/dev/null
 
 # Edit the uEnv.txt (s912-t95z-plus is /boot/extlinux/extlinux.conf)
-if [[ "${FDTFILE}" == "meson-gxm-t95z-plus.dtb" ]]; then
-    boot_conf_file="extlinux/extlinux.conf"
-else
-    boot_conf_file="uEnv.txt"
-fi
+#if [[ "${FDTFILE}" == "meson-gxm-t95z-plus.dtb" ]]; then
+boot_conf_file="extlinux/extlinux.conf"
+#else
+#    boot_conf_file="uEnv.txt"
+#fi
 echo -e "The boot file is [ ${boot_conf_file} ]"
+#
+#Get the current UUID, such as [ UUID=dc20e16b-1234-5678-a636-7945a906d0c6 ]
+CURRENT_ROOTFS_UUID="$(cat ${DIR_INSTALL}/${boot_conf_file} 2>/dev/null | grep -oE "append.*" | sed -e 's/^.*root=//' -e 's/ .*$//')"
+[ -z "${CURRENT_ROOTFS_UUID}" ] && echo "The current UUID is invalid, cannot continue." && exit 1
+echo "CURRENT_ROOTFS_UUID: ${CURRENT_ROOTFS_UUID}"
 #
 if [[ -f "${DIR_INSTALL}/${boot_conf_file}" ]]; then
     sed -i "s|${CURRENT_ROOTFS_UUID}|UUID=${ROOTFS_UUID}|g" ${DIR_INSTALL}/${boot_conf_file}
