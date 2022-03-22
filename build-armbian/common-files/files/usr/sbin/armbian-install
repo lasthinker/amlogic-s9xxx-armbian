@@ -33,7 +33,7 @@ fi
 
 install_emmc="$(lsblk -l -o NAME | grep -oE '(mmcblk[0-9]?boot0)' | sed "s/boot0//g")"
 if [[ "${install_emmc}" == "" ]]; then
-    echo "No emmc can be found to install the openwrt system!"
+    echo "No emmc can be found to install the armbian system!"
     exit 1
 fi
 
@@ -215,8 +215,8 @@ elif [[ "${AMLOGIC_SOC}" == "s905x" ]]; then
     BLANK2="0"
 else
     BLANK1="68"
-    BOOT="160"    # A total of [ 1120MB ] can be used in this block, and the remaining [ 960MB ] can be used.
-    BLANK2="1122" # Can set the rootfs partition after [ 1350MB ] of the total disk.
+    BOOT="256"    # A total of [ 1120MB ] can be used in this block, and the remaining [ 864MB ] can be used.
+    BLANK2="1026" # Can set the rootfs partition after [ 1350MB ] of the total disk.
 fi
 
 # Format emmc disk
