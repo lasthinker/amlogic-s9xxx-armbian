@@ -386,7 +386,7 @@ extract_armbian() {
     # Find ID in ${os_release_file}: such as [ubuntu/debian]
     release_codeid="$(cat ${os_release_file} | grep -oE "^ID=.*" | cut -d"=" -f2)"
     [ -z "${release_codeid}" ] && error_msg "The [ ${os_release_file}: ID ] is invalid."
-    # Find VERSION_CODENAME in ${os_release_file}: such as [focal/bullseye/buster]
+    # Find VERSION_CODENAME in ${os_release_file}: such as [jammy/focal/bullseye/buster]
     release_codename="$(cat ${os_release_file} | grep -oE "^VERSION_CODENAME=.*" | cut -d"=" -f2)"
     [ -z "${release_codename}" ] && error_msg "The [ ${os_release_file}: VERSION_CODENAME ] is invalid."
 
@@ -493,15 +493,15 @@ refactor_files() {
     mv -f etc/udev/rules.d/hdmi.rules etc/udev/rules.d/hdmi.rules.bak 2>/dev/null
 
     # Fix permission
-    chmod 777 var/tmp
-    chown man:root var/cache/man -R
-    chmod g+s var/cache/man -R
-    chown root:root usr/bin/sudo
-    chmod 4755 usr/bin/sudo
-    chown 0 usr/lib/sudo/sudoers.so
-    chmod 644 usr/lib/sudo/sudoers.so
-    chmod 4755 usr/lib/policykit-1/polkit-agent-helper-1
-    chmod 755 etc/update-motd.d/*
+    chmod 777 var/tmp 2>/dev/null
+    chown man:root var/cache/man -R 2>/dev/null
+    chmod g+s var/cache/man -R 2>/dev/null
+    chown root:root usr/bin/sudo 2>/dev/null
+    chmod 4755 usr/bin/sudo 2>/dev/null
+    chown 0 usr/lib/sudo/sudoers.so 2>/dev/null
+    chmod 644 usr/lib/sudo/sudoers.so 2>/dev/null
+    chmod 4755 usr/lib/policykit-1/polkit-agent-helper-1 2>/dev/null
+    chmod 755 etc/update-motd.d/* 2>/dev/null
 
     # Rebuild symbolic link files (ln -sf ${target} ${symbolic_link_file})
     ln -sf /usr/bin bin
@@ -579,7 +579,7 @@ make_image() {
     cd ${make_path}
 
     # Make Amlogic s9xxx armbian
-    build_image_file="${tmp_outpath}/Armbian_${armbian_rebuild_version}_Aml_${soc}_focal_${kernel}_$(date +"%Y.%m.%d.%H%M").img"
+    build_image_file="${tmp_outpath}/Armbian_${armbian_rebuild_version}_Aml_${soc}_${release_codename}_${kernel}_$(date +"%Y.%m.%d.%H%M").img"
     rm -f ${build_image_file} 2>/dev/null && sync
 
     IMG_SIZE=$((SKIP_MB + BOOT_MB + ROOT_MB))
@@ -650,12 +650,11 @@ clean_tmp() {
 
     cd ${tmp_outpath}
 
-    # Rename version
-    [[ "${release_codename}" != "focal" ]] && rename "s/focal/${release_codename}/g" *.img 2>/dev/null && sync
     gzip *.img && sync && mv -f *.img.gz ${armbian_outputpath}
     sync
 
     cd ${make_path}
+
     rm -rf ${tmp_dir} 2>/dev/null
 
     sync
