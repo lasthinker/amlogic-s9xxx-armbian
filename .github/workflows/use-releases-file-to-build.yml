@@ -12,7 +12,7 @@ on:
       sel_tags_keywords:
         description: "Release: jammy / focal / bullseye"
         required: false
-        default: "focal"
+        default: "bullseye"
       more_settings:
         description: "Rebuild: More parameter settings"
         required: false
