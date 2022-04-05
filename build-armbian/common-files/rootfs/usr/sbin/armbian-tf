@@ -57,6 +57,25 @@ esac
 create_new_part() {
     echo -e "${STEPS} Start creating a new partition ... "
 
+    # Set the type of file system
+    cat <<EOF
+--------------------------------------------
+Please select the type of file system:
+1. ext4
+2. btrfs
+--------------------------------------------
+EOF
+    read -p "Please Input ID: " filetype
+    if [[ "${filetype}" -eq "2" ]]; then
+        file_system_type="btrfs"
+        fstab_mount_string="defaults,noatime,compress=zstd:6"
+    else
+        file_system_type="ext4"
+        fstab_mount_string="defaults,noatime,errors=remount-ro"
+    fi
+    echo "Input Type ID: [ ${filetype} ]"
+    echo "The type of file system: [ ${file_system_type} ]"
+
     # Confirm UUID
     ROOTFS_UUID="$(cat /proc/sys/kernel/random/uuid)"
     [ -z "${ROOTFS_UUID}" ] && ROOTFS_UUID="$(uuidgen)"
@@ -99,15 +118,16 @@ EOF
     data_path="/data"
     mkdir -p ${data_path} && sync
 
-    # The file system type is ext4:
-    # mkfs.ext4 -F -p -U ${ROOTFS_UUID} -L "${LB_PRE}SHARED" "/dev/${PT_PRE}3"
-    # mount -t ext4 "/dev/${PT_PRE}3" "${data_path}"
-    # echo "UUID=${ROOTFS_UUID} ${data_path} ext4 defaults 0 0" >>/etc/fstab
+    if [[ "${file_system_type}" == "btrfs" ]]; then
+        mkfs.btrfs -f -U ${ROOTFS_UUID} -L "${LB_PRE}DATA" -m single "/dev/${PT_PRE}3"
+        mount -t btrfs -o compress=zstd:6 "/dev/${PT_PRE}3" "${data_path}"
+    else
+        mkfs.ext4 -F -q -U ${ROOTFS_UUID} -L "${LB_PRE}DATA" "/dev/${PT_PRE}3"
+        mount -t ext4 "/dev/${PT_PRE}3" "${data_path}"
+    fi
 
-    # The file system type is btrfs:
-    mkfs.btrfs -f -U ${ROOTFS_UUID} -L "${LB_PRE}DATA" -m single "/dev/${PT_PRE}3"
-    mount -t btrfs -o compress=zstd:6 "/dev/${PT_PRE}3" "${data_path}"
-    echo "UUID=${ROOTFS_UUID}  ${data_path}  btrfs  compress-force=zstd:6  0 0" >>/etc/fstab
+    # Add auto mount to /etc/fstab
+    echo "UUID=${ROOTFS_UUID}  ${data_path}  ${file_system_type}  ${fstab_mount_string}  0 0" >>/etc/fstab
 
     echo -e "${INFO} The new partition information: \n$(df -hT /dev/${PT_PRE}3)"
     echo -e "${SUCCESS} Create partition successfully, mount it in [ ${data_path} ]"
@@ -128,9 +148,12 @@ expand_current_part() {
     growpart /dev/${DISK_NAME} 2
 
     echo -e "${STEPS} Expansion file system ... "
-    # The file system type is ext4: [ resize2fs /dev/${ROOT_PTNAME} ]
-    # The file system type is btrfs: [ btrfs filesystem resize max / ]
-    btrfs filesystem resize max /
+    ROOTFS_TYPE="$(df -hT / | grep "/" | awk '{print $2}')"
+    if [[ "${ROOTFS_TYPE}" == "btrfs" ]]; then
+        btrfs filesystem resize max /
+    else
+        resize2fs /dev/${ROOT_PTNAME}
+    fi
 
     echo -e "${INFO} Current partition information: \n$(df -hT /)"
     echo -e "${SUCCESS} The current partition expansion is successful."
