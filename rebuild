@@ -11,11 +11,6 @@
 #
 # Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
 #
-#========= Install the basic packages of rebuild armbian for Ubuntu 20.04 =========
-#
-# sudo apt-get update -y
-# sudo apt-get full-upgrade -y
-# sudo apt-get install -y $(curl -fsSL git.io/ubuntu-2004-server)
 #
 # Command: sudo ./rebuild -d
 # Command optional parameters please refer to the source code repository
@@ -126,11 +121,13 @@ init_var() {
             ;;
         -b | --build)
             if [ -n "${2}" ]; then
-                unset build_armbian
-                oldIFS=$IFS
-                IFS=_
-                build_armbian=(${2})
-                IFS=$oldIFS
+                if [[ "${2}" != "all" ]]; then
+                    unset build_armbian
+                    oldIFS=$IFS
+                    IFS=_
+                    build_armbian=(${2})
+                    IFS=$oldIFS
+                fi
                 shift
             else
                 error_msg "Invalid -b parameter [ ${2} ]!"
@@ -469,7 +466,7 @@ refactor_files() {
     cd ${tag_bootfs}
 
     # Add u-boot.ext for 5.10 kernel
-    if [[ -n "${UBOOT_OVERLOAD}" && -f "${UBOOT_OVERLOAD}" ]]; then
+    if [[ "${K510}" -eq "1" && -n "${UBOOT_OVERLOAD}" && -f "${UBOOT_OVERLOAD}" ]]; then
         cp -f ${UBOOT_OVERLOAD} u-boot.ext
         chmod +x u-boot.ext
     elif [[ "${K510}" -eq "1" ]] && [[ -z "${UBOOT_OVERLOAD}" || ! -f "${UBOOT_OVERLOAD}" ]]; then

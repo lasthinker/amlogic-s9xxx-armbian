@@ -17,11 +17,11 @@ inputs:
     required: false
     default: "s905x"
   armbian_kernel:
-    description: "Set kernel."
+    description: "Set kernel version."
     required: false
     default: "5.15.25"
   version_branch:
-    description: "Set kernel."
+    description: "Set kernel branch."
     required: false
     default: "stable"
   auto_kernel:
@@ -81,11 +81,9 @@ runs:
           if [[ "${armbian_file}" == http* ]]; then
             echo -e "Use wget to download file: [ ${armbian_file} ]"
             sudo wget ${armbian_file} -q -P ${armbian_filepath} 2>/dev/null
-          elif [[ "${armbian_file:0:6}" != "build/" && "${armbian_file:0:8}" != "./build/" ]]; then
+          else
             echo -e "Copy files: [ ${armbian_file} ]"
             sudo cp -f ${GITHUB_WORKSPACE}/${armbian_file} ${armbian_filepath} 2>/dev/null
-          else
-            echo -e "Use armbian files: [ ${armbian_file} ]"
           fi
           sync
           echo -e "About the ${armbian_filepath} directory: \n $(ls ${armbian_filepath} -l 2>/dev/null)"
