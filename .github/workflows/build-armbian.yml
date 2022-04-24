@@ -12,11 +12,11 @@ on:
       set_branch:
         description: "Branch: edge / current / legacy"
         required: false
-        default: "current"
+        default: "edge"
       set_release:
         description: "Release: jammy / focal / bullseye"
         required: false
-        default: "bullseye"
+        default: "jammy"
       set_board:
         description: "Board: lepotato / odroidn2"
         required: false
@@ -73,10 +73,10 @@ jobs:
           fi
           echo "ARMBIAN_BRANCH=${set_branch}" >> $GITHUB_ENV
 
-          ARR_RELEASE=("jammy" "focal" "bullseye" "buster")
+          ARR_RELEASE=("jammy" "focal" "bullseye")
           set_release="${{ github.event.inputs.set_release }}"
           if  [[ -z "${set_release}" || -z "$(echo "${ARR_RELEASE[@]}" | grep -w "${set_release}")" ]]; then
-              set_release="bullseye"
+              set_release="focal"
           fi
           echo "ARMBIAN_RELEASE=${set_release}" >> $GITHUB_ENV
 
