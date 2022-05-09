@@ -77,13 +77,15 @@ runs:
           armbian_filepath="build/output/images"
           echo -e "Get armbian file input parameters: [ ${armbian_file} ]"
           [ -z "${armbian_file}" ] && echo -e "The [ armbian_path ] variable must be specified." && exit 1
-          [ -d "${armbian_filepath}" ] || sudo mkdir -p ${armbian_filepath}
+          [ -d "${armbian_filepath}" ] || mkdir -p ${armbian_filepath}
+          chmod -R 777 ${armbian_filepath}
+
           if [[ "${armbian_file}" == http* ]]; then
             echo -e "Use wget to download file: [ ${armbian_file} ]"
-            sudo wget ${armbian_file} -q -P ${armbian_filepath} 2>/dev/null
+            wget ${armbian_file} -q -P ${armbian_filepath} 2>/dev/null
           else
             echo -e "Copy files: [ ${armbian_file} ]"
-            sudo cp -f ${GITHUB_WORKSPACE}/${armbian_file} ${armbian_filepath} 2>/dev/null
+            cp -f ${GITHUB_WORKSPACE}/${armbian_file} ${armbian_filepath} 2>/dev/null
           fi
           sync
           echo -e "About the ${armbian_filepath} directory: \n $(ls ${armbian_filepath} -l 2>/dev/null)"
@@ -92,9 +94,9 @@ runs:
           echo -e "Check the armbian file format..."
           down_file="$(ls . -l 2>/dev/null | grep "^-" | awk '{print $9}' | head -n 1)"
           [ -z "${down_file}" ] && echo -e "The [ ${armbian_file} ] is invalid." && exit 1
-          [ "${down_file:0-7}" == ".img.gz" ] && sudo gzip -df ${down_file} 2>/dev/null && sync
-          [ "${down_file:0-7}" == ".img.xz" ] && sudo xz -d ${down_file} 2>/dev/null && sync
-          [ "${down_file:0-4}" == ".zip" ] && sudo unzip -o ${down_file} 2>/dev/null && sync
+          [ "${down_file:0-7}" == ".img.gz" ] && gzip -df ${down_file} 2>/dev/null && sync
+          [ "${down_file:0-7}" == ".img.xz" ] && xz -d ${down_file} 2>/dev/null && sync
+          [ "${down_file:0-4}" == ".zip" ] && unzip -o ${down_file} 2>/dev/null && sync
           echo -e "Armbian file: [ $(ls *.img -l 2>/dev/null) ]"
 
           cd ${GITHUB_ACTION_PATH}
@@ -110,19 +112,17 @@ runs:
           sudo ./rebuild ${make_command}
 
           cd ${GITHUB_ACTION_PATH}/${armbian_filepath}
-          echo -e "The armbian files in the [ ${armbian_filepath} ] directory. \n"
-          sudo gzip *.img && sync
-
-          cd ${GITHUB_ACTION_PATH}
+          gzip *.img && sync
+          sudo chmod -R 777 *
           echo -e "Output environment variables."
-          echo "PACKAGED_OUTPUTPATH=${PWD}/${armbian_filepath}" >> $GITHUB_ENV
+          echo "PACKAGED_OUTPUTPATH=${PWD}" >> $GITHUB_ENV
           echo "PACKAGED_OUTPUTDATE=$(date +"%Y.%m.%d.%H%M")" >> $GITHUB_ENV
           echo "PACKAGED_STATUS=success" >> $GITHUB_ENV
-          echo -e "PACKAGED_OUTPUTPATH: ${PWD}/${armbian_filepath}"
+          echo -e "PACKAGED_OUTPUTPATH: ${PWD}"
           echo -e "PACKAGED_OUTPUTDATE: $(date +"%Y.%m.%d.%H%M")"
           echo -e "PACKAGED_STATUS: success"
           echo -e "PACKAGED_OUTPUTPATH files list:"
-          echo -e "$(ls ${PWD}/${armbian_filepath} 2>/dev/null) \n"
+          echo -e "$(ls -l . 2>/dev/null) \n"
 
         elif [ "${build_target}" == "kernel" ]; then
 
@@ -130,12 +130,11 @@ runs:
           echo -e "Start compile kernel..."
 
           config_filepath="compile-kernel/tools/config"
-          kernel_outpath="compile-kernel/output"
           if [[ -n "${{ inputs.kernel_config }}" ]]; then
             if [[ "$(ls ${GITHUB_WORKSPACE}/${{ inputs.kernel_config }}/config-* -l 2>/dev/null | grep "^-" | wc -l)" -ne "0" ]]; then
               echo -e "Use a custom kernel compilation template."
               rm -f ${config_filepath}/* 2>/dev/null && sync
-              sudo cp -f ${GITHUB_WORKSPACE}/${{ inputs.kernel_config }}/config-* ${config_filepath}/ 2>/dev/null && sync
+              cp -f ${GITHUB_WORKSPACE}/${{ inputs.kernel_config }}/config-* ${config_filepath}/ 2>/dev/null && sync
               echo -e "List of Kernel Custom Compilation Configuration Templates: \n$(ls ${config_filepath})"
             else
               echo -e "The custom kernel compilation template path is invalid, continue to use the default template."
@@ -143,6 +142,9 @@ runs:
           else
             echo -e "Use the default kernel compilation template."
           fi
+
+          kernel_outpath="compile-kernel/output"
+          [ -d "${kernel_outpath}" ] || mkdir -p ${kernel_outpath}
 
           make_command=" -d"
           [ -n ${{ inputs.kernel_version }} ] && make_command="${make_command} -k ${{ inputs.kernel_version }}"
@@ -154,19 +156,20 @@ runs:
 
           echo -e "The kernel files in the [ ${kernel_outpath} ] directory. \n"
 
-          cd ${GITHUB_ACTION_PATH}
-          output_tags="$(ls ${PWD}/${kernel_outpath}/*.tar.gz -l | awk '{print $9}' | grep -oE '[1-9].[0-9]{1,3}.[0-9]+' | xargs | tr "[ ]" "_")"
+          cd ${GITHUB_ACTION_PATH}/${kernel_outpath}
+          sudo chmod -R 777 *
+          output_tags="$(ls -l *.tar.gz | awk '{print $9}' | grep -oE '[1-9].[0-9]{1,3}.[0-9]+' | xargs | tr "[ ]" "_")"
           echo -e "Output environment variables."
           echo "PACKAGED_OUTPUTTAGS=${output_tags}" >> $GITHUB_ENV
-          echo "PACKAGED_OUTPUTPATH=${PWD}/${kernel_outpath}" >> $GITHUB_ENV
+          echo "PACKAGED_OUTPUTPATH=${PWD}" >> $GITHUB_ENV
           echo "PACKAGED_OUTPUTDATE=$(date +"%Y.%m.%d.%H%M")" >> $GITHUB_ENV
           echo "PACKAGED_STATUS=success" >> $GITHUB_ENV
           echo -e "PACKAGED_OUTPUTTAGS: ${output_tags}"
-          echo -e "PACKAGED_OUTPUTPATH: ${PWD}/${kernel_outpath}"
+          echo -e "PACKAGED_OUTPUTPATH: ${PWD}"
           echo -e "PACKAGED_OUTPUTDATE: $(date +"%Y.%m.%d.%H%M")"
           echo -e "PACKAGED_STATUS: success"
           echo -e "PACKAGED_OUTPUTPATH files list:"
-          echo -e "$(ls ${PWD}/${kernel_outpath} 2>/dev/null) \n"
+          echo -e "$(ls -l . 2>/dev/null) \n"
 
         else
           echo -e "Please select a build target: armbian / kernel"
