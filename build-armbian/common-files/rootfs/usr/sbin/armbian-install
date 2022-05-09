@@ -63,6 +63,7 @@ AMLOGIC_MODEL_LIST="
 103:hg680p & b860h:s905x:meson-gxl-s905x-p212.dtb:u-boot-p212.bin:NA:NA:4C@1512Mhz,100Mb Nic
 104:X96-Mini & TX3-Mini:s905w:meson-gxl-s905w-tx3-mini.dtb:u-boot-s905x-s912.bin:NA:NA:4C@1512Mhz,100Mb Nic
 105:MECOOL KI Pro:s905d:meson-gxl-s905d-mecool-ki-pro.dtb:u-boot-p201.bin:NA:NA:2G/16G,1Gb Nic
+106:T95:s905x:meson-gxl-s905x-p212.dtb:u-boot-s905x-s912.bin:NA:NA:2G/16G,1Gb Nic
 
 # Amlogic GXM Family
 201:Octopus Planet:s912:meson-gxm-octopus-planet.dtb:u-boot-zyxq.bin:NA:NA:4C@1512Mhz+4C@1000Mhz,2GB Mem,1Gb Nic
@@ -71,6 +72,7 @@ AMLOGIC_MODEL_LIST="
 204:Tanix-TX92:s912:meson-gxm-octopus-planet.dtb:u-boot-zyxq.bin:NA:NA:3GB DDR4 32GB eMMC,1.5GHz,5G WIFI,1Gb Nic
 205:VORKE-Z6-Plus:s912:meson-gxm-octopus-planet.dtb:u-boot-zyxq.bin:NA:NA:3GB DDR3 32GB eMMC5.0,1.5Ghz,TF CARD Support 1~32GB,1Gb Nic
 206:MECOOL M8S Pro L:s912:meson-gxm-q201.dtb:u-boot-s905x-s912.bin:NA:NA:2G RAM,3G RAM,16G ROM,32G ROM,100Mb Nic
+207:T95Z Plus:s912:meson-gxm-t95z-plus.dtb:u-boot-s905x-s912.bin:NA:NA:3G+32G,Octa-Core,2.4/5.8G Dual-Band WiFi,1Gb Nic
 
 # Amlogic G12A Family
 301:X96 Max 4GB:s905x2:meson-g12a-x96-max.dtb:u-boot-x96max.bin:/usr/lib/u-boot/x96max-u-boot.bin.sd.bin:NA:4C@1908Mhz,4GB Mem,1Gb Nic
@@ -282,13 +284,25 @@ cp -rf /boot/* ${DIR_INSTALL} && sync
 rm -rf ${DIR_INSTALL}/'System Volume Information' 2>/dev/null
 
 echo "Generate the new uEnv.txt file."
-rm -f ${DIR_INSTALL}/uEnv.txt 2>/dev/null && sync
+rm -rf ${DIR_INSTALL}/uEnv.txt ${DIR_INSTALL}/extlinux 2>/dev/null && sync
 cat >${DIR_INSTALL}/uEnv.txt <<EOF
 LINUX=/zImage
 INITRD=/uInitrd
 FDT=/dtb/amlogic/${FDTFILE}
 APPEND=root=${uenv_mount_string} console=ttyAML0,115200n8 console=tty0 no_console_suspend consoleblank=0 fsck.fix=yes fsck.repair=yes net.ifnames=0 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory swapaccount=1
 EOF
+# Create a new extlinux.conf file (Temporarily tested in 5.10 kernel)
+if [[ "${K510}" -eq "1" ]]; then
+    echo "Generate the new extlinux.conf file."
+    mkdir -p ${DIR_INSTALL}/extlinux
+    cat >${DIR_INSTALL}/extlinux/extlinux.conf <<EOF
+label Armbian
+    kernel /zImage
+    initrd /uInitrd
+    fdt /dtb/amlogic/${FDTFILE}
+    append root=${uenv_mount_string} console=ttyAML0,115200n8 console=tty0 no_console_suspend consoleblank=0 fsck.fix=yes fsck.repair=yes net.ifnames=0 loglevel=1 voutmode=hdmi disablehpd=false overscan=100 sdrmode=auto
+EOF
+fi
 
 rm ${DIR_INSTALL}/s9*
 rm ${DIR_INSTALL}/aml*
