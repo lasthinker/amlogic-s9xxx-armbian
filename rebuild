@@ -1,5 +1,5 @@
 #!/bin/bash
-#==================================================================================
+#========================================================================================
 #
 # This file is licensed under the terms of the GNU General Public
 # License version 2. This program is licensed "as is" without any
@@ -15,7 +15,7 @@
 # Command: sudo ./rebuild -d
 # Command optional parameters please refer to the source code repository
 #
-#================================= Functions list =================================
+#==================================== Functions list ====================================
 #
 # error_msg          : Output error message
 # process_msg        : Output process message
@@ -34,7 +34,7 @@
 #
 # loop_rebuild       : Loop to rebuild Armbian files
 #
-#========================= Set make environment variables =========================
+#============================ Set make environment variables ============================
 #
 # Related file storage path
 make_path="${PWD}"
@@ -50,6 +50,8 @@ tmp_outpath="${tmp_dir}/tmp_out"
 tmp_armbian="${tmp_dir}/tmp_armbian"
 tmp_build="${tmp_dir}/tmp_build"
 tmp_aml_image="${tmp_dir}/tmp_aml_image"
+arch_info="$(arch)"
+host_release="$(cat /etc/os-release | grep VERSION_CODENAME | cut -d"=" -f2)"
 # Get armbian ${VERSION_CODENAME}: such as [ jammy ]
 os_release_file="etc/os-release"
 # Set banner's ${BOARD_NAME}: such as [ s905x ]
@@ -72,7 +74,7 @@ ROOT_MB="2748"
 # Set ROOTFS partition file system type, options: [ ext4 / btrfs ]
 ROOTFS_TYPE="ext4"
 #
-#==================================================================================
+#========================================================================================
 
 error_msg() {
     echo -e " [\033[1;91m Error \033[0m] ${1}"
@@ -705,10 +707,11 @@ loop_rebuild() {
     done
 }
 
-# Show welcome message
+# Check script permission
+[[ "$(id -u)" == "0" ]] || error_msg "please run this script as root: [ sudo ./$0 ]"
+# Show welcome and server start information
 echo -e "Welcome to Rebuild Armbian for Amlogic S905X"
-[ $(id -u) = 0 ] || error_msg "please run this script as root: [ sudo ./$0 ]"
-# Show server start information
+echo -e "Server running on Ubuntu: [ Release: ${host_release} / Host: ${arch_info} ] \n"
 echo -e "Server CPU configuration information: \n$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
 echo -e "Server memory usage: \n$(free -h) \n"
 echo -e "Server space usage before starting to compile: \n$(df -hT ${PWD}) \n"
