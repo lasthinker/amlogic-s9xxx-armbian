@@ -36,18 +36,18 @@ echo -e "${INFO} Current system: [ ${chroot_arch_info} ]"
 echo -e "${INFO} Current path: [ ${chroot_make_path} ]"
 echo -e "${INFO} Compile the kernel version: [ ${chroot_kernel_version} ]"
 
-# Environment initialization
+# Install the required dependencies
 chroot_env_init() {
-    echo -e "${STEPS} Environment initialization."
+    echo -e "${STEPS} Install the required dependencies..."
     sudo apt-get update -y
     sudo apt-get upgrade -y
-    sudo apt-get install -y $(curl -fsSL git.io/armbian-kernel-server)
+    sudo apt-get install -y git fakeroot build-essential initramfs-tools libncurses-dev xz-utils libssl-dev bc flex libelf-dev bison
 }
 
 # Generate uInitrd
 chroot_generate_uinitrd() {
     cd /boot
-    echo -e "${STEPS} Generate uInitrd file."
+    echo -e "${STEPS} Generate uInitrd file..."
     #echo -e "${INFO} File status in the /boot directory before the update: \n$(ls -l .) \n"
 
     cp -f vmlinuz-${chroot_kernel_version} zImage 2>/dev/null && sync
@@ -65,6 +65,7 @@ chroot_generate_uinitrd() {
     echo -e "${INFO} File situation in the /boot directory after update: \n$(ls -l *${chroot_kernel_version})"
 }
 
+# If dependencies such as initramfs-tools are missing, please enable the [ chroot_env_init ] method
 #chroot_env_init
 chroot_generate_uinitrd
 
