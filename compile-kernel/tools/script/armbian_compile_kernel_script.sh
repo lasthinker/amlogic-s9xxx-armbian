@@ -7,10 +7,7 @@
 #
 # This file is a part of the Armbian Rebuild and kernel Recompile script
 #
-# Description: Run on Ubuntu-22.04-x86_64, Compile the kernel for Amlogic s9xxx tv box
-#
 # Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
-#
 #
 # Command: sudo ./recompile -d
 # Command optional parameters please refer to the source code repository
@@ -40,11 +37,7 @@ compile_path="${make_path}/compile-kernel"
 kernel_path="${compile_path}/kernel"
 config_path="${compile_path}/tools/config"
 script_path="${compile_path}/tools/script"
-armbian_path="${compile_path}/tools/armbian"
-armbian_file="${armbian_path}/armbian.img"
 out_kernel="${compile_path}/output"
-chroot_path="${out_kernel}/chroot"
-chroot_file="${chroot_path}/chroot_armbian.img"
 arch_info="$(arch)"
 host_release="$(cat /etc/os-release | grep VERSION_CODENAME | cut -d"=" -f2)"
 toolchain_path="/usr/local/toolchain"
@@ -62,18 +55,8 @@ custom_name="-lasthinker"
 # Cross compile toolchain download mirror, run on ubuntu-20.04
 dev_repo="https://github.com/ophub/kernel/releases/download/dev"
 #
-# Armbian download from: https://github.com/lasthinker/amlogic-s9xxx-armbian/releases
-armbian_rootfs_file="armbian_22.05.0_aml_s922x_focal_5.15.35.tar.xz"
-#
-# GCC download from: https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/downloads
-gcc_file="gcc-arm-11.2-2022.02-x86_64-aarch64-none-linux-gnu.tar.xz"
-#
 # Clang download from: https://github.com/llvm/llvm-project/releases
-clang_file="clang+llvm-13.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-#
-# QEMU BINARY
-qemu_binary_arm="qemu-arm-static"
-qemu_binary_arm64="qemu-aarch64-static"
+clang_file="clang+llvm-14.0.0-aarch64-linux-gnu.tar.xz"
 #
 # Set font color
 blue_font_prefix="\033[94m"
@@ -165,26 +148,12 @@ toolchain_check() {
     cd ${make_path}
     echo -e "${STEPS} Check the cross-compilation environment ..."
 
-    if [[ "${host_release}" == "jammy" ]]; then
-        # Install dependencies for jammy
-        sudo apt-get -qq update
-        sudo apt-get -qq install -y $(cat compile-kernel/tools/script/ubuntu2204-build-armbian-depends)
-    else
-        # Install dependencies for focal
-        sudo apt-get -qq update
-        sudo apt-get -qq install -y $(cat compile-kernel/tools/script/ubuntu2004-build-armbian-depends)
+    # Install dependencies
+    sudo apt-get -qq update
+    sudo apt-get -qq install -y $(cat compile-kernel/tools/script/armbian-compile-kernel-depends)
 
+    if [[ "${host_release}" != "jammy" ]]; then
         [ -d "${toolchain_path}" ] || mkdir -p ${toolchain_path}
-
-        # Download gcc for Ubuntu focal
-        if [[ ! -d "${toolchain_path}/${gcc_file//.tar.xz/}/bin" ]]; then
-            echo -e "${INFO} Download gcc [ ${gcc_file} ] ..."
-            wget -c "${dev_repo}/${gcc_file}" -O "${toolchain_path}/${gcc_file}" >/dev/null 2>&1 && sync
-            tar -xJf ${toolchain_path}/${gcc_file} -C ${toolchain_path} && sync
-            rm -f ${toolchain_path}/${gcc_file} && sync
-            [ -d "${toolchain_path}/${gcc_file//.tar.xz/}/bin" ] || error_msg "The gcc is not set!"
-        fi
-
         # Download clang for Ubuntu focal
         if [[ ! -d "${toolchain_path}/${clang_file//.tar.xz/}/bin" ]]; then
             echo -e "${INFO} Download clang [ ${clang_file} ] ..."
@@ -193,17 +162,6 @@ toolchain_check() {
             rm -f ${toolchain_path}/${clang_file} && sync
             [ -d "${toolchain_path}/${clang_file//.tar.xz/}/bin" ] || error_msg "The clang is not set!"
         fi
-    fi
-
-    # Download armbian
-    if [ ! -f "${armbian_file}" ]; then
-        echo -e "${INFO} Download armbian [ ${armbian_rootfs_file} ] ..."
-        rm -rf ${armbian_path} 2>/dev/null && mkdir -p ${armbian_path}
-        wget -c "${dev_repo}/${armbian_rootfs_file}" -O "${armbian_path}/${armbian_rootfs_file}" >/dev/null 2>&1 && sync
-        tar -xJf ${armbian_path}/${armbian_rootfs_file} -C ${armbian_path} && sync
-        mv -f ${armbian_path}/*.img ${armbian_file} && sync
-        rm -f ${armbian_path}/${armbian_rootfs_file} && sync
-        [ -f "${armbian_file}" ] || error_msg "There is no armbian file: [ ${armbian_file} ]"
     fi
 }
 
@@ -222,7 +180,7 @@ query_version() {
         MAIN_LINE="${MAIN_LINE_M}.${MAIN_LINE_V}"
 
         if [ "${code_owner}" == "kernel.org" ]; then
-            # latest_version="5.15.25"
+            # latest_version="5.10.100"
             latest_version=$(curl -s ${kernel_org_repo} | grep -oE linux-${MAIN_LINE}.[0-9]+.tar.xz | sort -rV | head -n 1 | grep -oE '[1-9].[0-9]{1,3}.[0-9]+')
             if [[ "$?" -eq "0" && ! -z "${latest_version}" ]]; then
                 tmp_arr_kernels[${i}]="${latest_version}"
@@ -315,8 +273,8 @@ env_check() {
     echo -e "${INFO} Compile kernel output name [ ${kernel_outname} ]. \n"
 
     # Create a temp directory
-    rm -rf ${out_kernel}/{chroot/,boot/,dtb/,modules/,header/,${kernel_version}/} 2>/dev/null && sync
-    mkdir -p ${out_kernel}/{chroot/{root/boot/,},boot/,dtb/{allwinner/,amlogic/,rockchip/},modules/,header/,${kernel_version}/} && sync
+    rm -rf ${out_kernel}/{boot/,dtb/,modules/,header/,${kernel_version}/} 2>/dev/null && sync
+    mkdir -p ${out_kernel}/{boot/,dtb/{allwinner/,amlogic/,rockchip/},modules/,header/,${kernel_version}/} && sync
 }
 
 compile_kernel() {
@@ -327,17 +285,15 @@ compile_kernel() {
     export ARCH="arm64"
     export LOCALVERSION="${custom_name}"
     if [[ "${host_release}" == "jammy" ]]; then
-        export CROSS_COMPILE=aarch64-linux-gnu-
         export CC=clang
         export LD=ld.lld
     else
-        export CROSS_COMPILE=${toolchain_path}/${gcc_file//.tar.xz/}/bin/aarch64-none-linux-gnu-
         export CC=${toolchain_path}/${clang_file//.tar.xz/}/bin/clang
         export LD=${toolchain_path}/${clang_file//.tar.xz/}/bin/ld.lld
         #
         # Add $PATH variable
-        path_ubuntu="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
-        path_clang=${toolchain_path}/${clang_file//.tar.xz/}/bin:${path_ubuntu}
+        path_armbian="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        path_clang=${toolchain_path}/${clang_file//.tar.xz/}/bin:${path_armbian}
         # Set $PATH variable for ~/.bashrc
         sed -i '/^PATH=/d' ~/.bashrc 2>/dev/null && sync
         echo "PATH=${path_clang}" >>~/.bashrc && sync
@@ -351,14 +307,13 @@ compile_kernel() {
     # Show variable
     echo -e "${INFO} ARCH: [ ${ARCH} ]"
     echo -e "${INFO} LOCALVERSION: [ ${LOCALVERSION} ]"
-    echo -e "${INFO} CROSS_COMPILE: [ ${CROSS_COMPILE} ]"
     echo -e "${INFO} CC: [ ${CC} ]"
     echo -e "${INFO} LD: [ ${LD} ]"
     # Set generic make string
-    MAKE_SET_STRING=" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} CC=${CC} LD=${LD} LLVM=1 LLVM_IAS=1 LOCALVERSION=${LOCALVERSION} "
+    MAKE_SET_STRING=" ARCH=${ARCH} CC=${CC} LD=${LD} LLVM=1 LLVM_IAS=1 LOCALVERSION=${LOCALVERSION} "
 
     # Make clean/mrproper
-    make ${MAKE_SET_STRING} clean
+    #make ${MAKE_SET_STRING} clean
 
     # Make menuconfig
     #make ${MAKE_SET_STRING} menuconfig
@@ -408,63 +363,59 @@ compile_kernel() {
 
 generate_uinitrd() {
     cd ${make_path}
-    echo -e "${STEPS} Create chroot..."
+    echo -e "${STEPS} Generate uInitrd environment initialization..."
 
-    cp -f ${armbian_file} ${chroot_file} && sync
-
-    # Mount the armbian system
-    tag_rootfs=${chroot_path}/root
-
-    loop_armbian=$(losetup -P -f --show "${chroot_file}")
-    [ ${loop_armbian} ] || error_msg "losetup ${chroot_file} failed."
-
-    if ! mount ${loop_armbian}p2 ${tag_rootfs}; then
-        error_msg "mount ${loop_armbian}p2 failed!"
-    fi
-    if ! mount ${loop_armbian}p1 ${tag_rootfs}/boot; then
-        error_msg "mount ${loop_armbian}p1 failed!"
-    fi
-
+    # Backup current system files for /boot
+    echo -e "${INFO} Backup the files in the [ /boot ] directory."
+    boot_backup_path="/boot/backup"
+    rm -rf ${boot_backup_path} && mkdir -p ${boot_backup_path} && sync
+    mv -f /boot/{config-*,initrd.img-*,System.map-*,uInitrd-*,vmlinuz-*,uInitrd,zImage} ${boot_backup_path} 2>/dev/null && sync
     # Copy /boot related files into armbian system
-    rm -f ${tag_rootfs}/boot/{config-*,initrd.img-*,System.map-*,uInitrd-*,vmlinuz-*,uInitrd,zImage} 2>/dev/null && sync
-    #
-    cp -f ${kernel_path}/${local_kernel_path}/System.map ${tag_rootfs}/boot/System.map-${kernel_outname}
-    cp -f ${kernel_path}/${local_kernel_path}/.config ${tag_rootfs}/boot/config-${kernel_outname}
-    cp -f ${kernel_path}/${local_kernel_path}/arch/arm64/boot/Image ${tag_rootfs}/boot/vmlinuz-${kernel_outname}
+    cp -f ${kernel_path}/${local_kernel_path}/System.map /boot/System.map-${kernel_outname}
+    cp -f ${kernel_path}/${local_kernel_path}/.config /boot/config-${kernel_outname}
+    cp -f ${kernel_path}/${local_kernel_path}/arch/arm64/boot/Image /boot/vmlinuz-${kernel_outname}
     sync
-    #echo -e "${INFO} Kernel copy results in the [ ${tag_rootfs}/boot ] directory: \n$(ls -l ${tag_rootfs}/boot) \n"
+    #echo -e "${INFO} Kernel copy results in the [ /boot ] directory: \n$(ls -l /boot) \n"
 
-    rm -rf ${tag_rootfs}/usr/lib/modules/* 2>/dev/null && sync
-    cp -rf ${out_kernel}/modules/lib/modules/${kernel_outname} ${tag_rootfs}/usr/lib/modules && sync
-    #echo -e "${INFO} Kernel copy results in the [ ${tag_rootfs}/usr/lib/modules ] directory: \n$(ls -l ${tag_rootfs}/usr/lib/modules) \n"
+    # Backup current system files for /usr/lib/modules
+    echo -e "${INFO} Backup the files in the [ /usr/lib/modules ] directory."
+    modules_backup_path="/usr/lib/modules/backup"
+    rm -rf ${modules_backup_path} && mkdir -p ${modules_backup_path} && sync
+    mv -f /usr/lib/modules/$(uname -r) ${modules_backup_path} && sync
+    # Copy modules files
+    cp -rf ${out_kernel}/modules/lib/modules/${kernel_outname} /usr/lib/modules
+    sync
+    #echo -e "${INFO} Kernel copy results in the [ /usr/lib/modules ] directory: \n$(ls -l /usr/lib/modules) \n"
 
     # COMPRESS: [ gzip | bzip2 | lz4 | lzma | lzop | xz | zstd ]
-    compress_initrd_file="${tag_rootfs}/etc/initramfs-tools/initramfs.conf"
+    compress_initrd_file="/etc/initramfs-tools/initramfs.conf"
     sed -i "/^COMPRESS=/d" ${compress_initrd_file} && sync
     echo "COMPRESS=gzip" >>${compress_initrd_file} && sync
 
-    [ -f "/usr/bin/${qemu_binary_arm}" ] && cp -f /usr/bin/${qemu_binary_arm} ${tag_rootfs}/usr/bin/ && sync
-    [ -f "/usr/bin/${qemu_binary_arm64}" ] && cp -f /usr/bin/${qemu_binary_arm64} ${tag_rootfs}/usr/bin/ && sync
-    #echo -e "${INFO} The [ ${qemu_binary_arm64} ] file copy results: \n$(ls -l ${tag_rootfs}/usr/bin/${qemu_binary_arm64}) \n"
+    cd /boot
+    echo -e "${STEPS} Generate uInitrd file..."
+    #echo -e "${INFO} File status in the /boot directory before the update: \n$(ls -l .) \n"
 
-    cp -f ${script_path}/ubuntu_chroot_armbian.sh ${tag_rootfs}/root 2>/dev/null && sync
-    chmod +x ${tag_rootfs}/root/ubuntu_chroot_armbian.sh 2>/dev/null
-    #echo -e "${INFO} Kernel copy results in the [ ${tag_rootfs}/root ] directory: \n$(ls -l ${tag_rootfs}/root) \n"
+    cp -f vmlinuz-${kernel_outname} zImage 2>/dev/null && sync
 
-    # Enter the armbian system to generate /boot/uInitrd-${kernel_outname} file
-    echo -e "${INFO} Enter the chroot armbian system..."
-    chroot ${tag_rootfs} /bin/bash -c "/root/ubuntu_chroot_armbian.sh ${kernel_outname}"
-    [[ $? -ne 0 || ! -f "${tag_rootfs}"/boot/uInitrd-${kernel_outname} ]] && error_msg "Create chroot uInitrd-${kernel_outname} file failed."
+    # Generate uInitrd file directly under armbian system
+    update-initramfs -c -k ${kernel_outname} 2>/dev/null
 
-    cd ${make_path}
-    # Copy the generated uInitrd file to the current system
-    echo -e "${INFO} Copy the generated files from [ ${tag_rootfs}/boot ]"
-    cp -f ${tag_rootfs}/boot/*${kernel_outname} ${out_kernel}/boot && sync
+    if [ -f uInitrd ]; then
+        echo -e "${SUCCESS} The initrd.img and uInitrd file is Successfully generated."
+        mv -f uInitrd uInitrd-${kernel_outname} 2>/dev/null && sync
+    else
+        echo -e "${WARNING} The initrd.img and uInitrd file not updated."
+    fi
 
-    # Unmount the armbian system
-    umount ${tag_rootfs}/boot 2>/dev/null
-    umount ${tag_rootfs} 2>/dev/null
-    losetup -D 2>/dev/null
+    echo -e "${INFO} File situation in the /boot directory after update: \n$(ls -l *${kernel_outname})"
+
+    # Restore original system files
+    mv -f /boot/*${kernel_outname} ${out_kernel}/boot && sync
+    mv -f ${boot_backup_path}/* /boot && sync && rm -rf ${boot_backup_path}
+    #
+    rm -rf /usr/lib/modules/${kernel_outname} 2>/dev/null && sync
+    mv ${modules_backup_path}/* /usr/lib/modules && sync && rm -rf ${modules_backup_path}
 }
 
 packit_kernel() {
@@ -513,14 +464,10 @@ packit_kernel() {
 
 clean_tmp() {
     cd ${make_path}
-    echo -e "${STEPS} Clear the space and update-grub."
+    echo -e "${STEPS} Clear the space..."
 
-    rm -rf ${out_kernel}/{chroot/,boot/,dtb/,modules/,header/,${kernel_version}/} 2>/dev/null && sync
+    rm -rf ${out_kernel}/{boot/,dtb/,modules/,header/,${kernel_version}/} 2>/dev/null && sync
 
-    update-grub 2>/dev/null
-    echo -e "${SUCCESS} Space cleared successfully."
-
-    sync
     echo -e "${SUCCESS} All processes have been completed."
 }
 
@@ -529,11 +476,11 @@ loop_recompile() {
 
     j=1
     for k in ${build_kernel[*]}; do
-        # kernel_version, such as [ 5.15.25 ]
+        # kernel_version, such as [ 5.10.100 ]
         kernel_version="${k}"
-        # kernel_verpatch, such as [ 5.15 ]
+        # kernel_verpatch, such as [ 5.10 ]
         kernel_verpatch="$(echo ${kernel_version} | awk -F '.' '{print $1"."$2}')"
-        # kernel_sub, such as [ 25 ]
+        # kernel_sub, such as [ 100 ]
         kernel_sub="$(echo ${kernel_version} | awk -F '.' '{print $3}')"
 
         # The loop variable assignment
@@ -560,16 +507,16 @@ loop_recompile() {
     done
 }
 
-# Check script permission, supports running on x86_64 Ubuntu: [ jammy / focal ]
+# Check script permission, supports running on Armbian system.
 [[ "$(id -u)" == "0" ]] || error_msg "Please run this script as root: [ sudo ./$0 ]"
-[[ -n "${host_release}" && "jammy focal" == *"${host_release}"* ]] || error_msg "Supports running on Ubuntu: [ jammy / focal ]"
-[[ "${arch_info}" == "x86_64" ]] || error_msg "Running this tool on non-x86_64 Ubuntu build hosts is not supported."
+[[ "${arch_info}" == "aarch64" ]] || error_msg "The script only supports running under Armbian system."
 # Show welcome and server start information
 echo -e "Welcome to compile kernel! \n"
 echo -e "Server running on Ubuntu: [ Release: ${host_release} / Host: ${arch_info} ] \n"
+echo -e "Server running path [ ${make_path} ] \n"
 echo -e "Server CPU configuration information: \n$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
 echo -e "Server memory usage: \n$(free -h) \n"
-echo -e "Server space usage before starting to compile: \n$(df -hT ${PWD}) \n"
+echo -e "Server space usage before starting to compile: \n$(df -hT ${make_path}) \n"
 #
 # Initialize variables, download the kernel source code and check the toolchain
 init_var "${@}"
@@ -581,6 +528,6 @@ toolchain_check
 loop_recompile
 #
 # Show server end information
-echo -e "${INFO} Server space usage after compilation: \n$(df -hT ${PWD}) \n"
+echo -e "${INFO} Server space usage after compilation: \n$(df -hT ${make_path}) \n"
 # All process completed
 wait
