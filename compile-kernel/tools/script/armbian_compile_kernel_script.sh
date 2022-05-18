@@ -9,7 +9,7 @@
 #
 # Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
 #
-# Command: sudo ./recompile -d
+# Command: armbian-kernel -update && armbian-kernel -d -k 5.15.25
 # Command optional parameters please refer to the source code repository
 #
 #======================================= Functions list =======================================
