@@ -5,7 +5,7 @@
 # License version 2. This program is licensed "as is" without any
 # warranty of any kind, whether express or implied.
 #
-# This file is a part of the Armbian Rebuild and kernel Recompile script
+# This file is a part of the Armbian for Amlogic S905X
 #
 # Function: Armbian kernel update
 #
@@ -47,7 +47,7 @@ auto_mainline_uboot="yes"
 
 # Encountered a serious error, abort the script execution
 error_msg() {
-    echo -e " [Error] ${1}"
+    echo -e " [\033[1;91m Error \033[0m] ${1}"
     exit 1
 }
 

@@ -1,18 +1,18 @@
 #!/bin/bash
-#==============================================================================================
+#==================================================================================
 #
 # This file is licensed under the terms of the GNU General Public
 # License version 2. This program is licensed "as is" without any
 # warranty of any kind, whether express or implied.
 #
-# This file is a part of the Armbian Rebuild and kernel Recompile script
+# This file is a part of the Armbian for Amlogic S905X
 #
 # Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
 #
 # Command: armbian-kernel -update && armbian-kernel -d -k 5.15.25
 # Command optional parameters please refer to the source code repository
 #
-#======================================= Functions list =======================================
+#================================= Functions list =================================
 #
 # error_msg          : Output error message
 #
@@ -29,7 +29,7 @@
 #
 # loop_recompile     : Loop to compile kernel
 #
-#=============================== Set make environment variables ===============================
+#========================= Set make environment variables =========================
 #
 # Related file storage path
 make_path="${PWD}"
@@ -71,10 +71,10 @@ SUCCESS="[${green_font_prefix}SUCCESS${font_color_suffix}]"
 WARNING="[${yellow_font_prefix}WARNING${font_color_suffix}]"
 ERROR="[${red_font_prefix}ERROR${font_color_suffix}]"
 #
-#==============================================================================================
+#==================================================================================
 
 error_msg() {
-    echo -e "${ERROR} ${1}"
+    echo -e " ${ERROR} ${1}"
     exit 1
 }
 
