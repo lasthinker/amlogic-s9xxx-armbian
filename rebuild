@@ -5,9 +5,9 @@
 # License version 2. This program is licensed "as is" without any
 # warranty of any kind, whether express or implied.
 #
-# This file is a part of the Armbian for Amlogic S905X
+# This file is a part of the Armbian for Amlogic
 #
-# Description: Run on Ubuntu-20.04-x86_64, Build armbian for Amlogic S905X
+# Description: Run on Ubuntu-20.04-x86_64, Build armbian for Amlogic
 #
 # Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
 #

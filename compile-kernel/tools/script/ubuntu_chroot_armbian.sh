@@ -5,7 +5,7 @@
 # License version 2. This program is licensed "as is" without any
 # warranty of any kind, whether express or implied.
 #
-# This file is a part of the Armbian for Amlogic S905X
+# This file is a part of the Armbian for Amlogic
 #
 # Description: Run on Armbian, generate uinitrd
 #
