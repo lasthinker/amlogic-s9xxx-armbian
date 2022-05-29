@@ -1,5 +1,5 @@
 #==========================================================================
-# Description: Build Armbian For Amlogic S905X
+# Description: Build Armbian For Amlogic
 # Copyright (C) 2021 https://github.com/lasthinker/amlogic-s9xxx-armbian
 #==========================================================================
 
@@ -22,11 +22,11 @@ on:
         required: false
         default: "5.15.25"
       armbian_size:
-        description: "Set armbian rootfs size."
+        description: "Set armbian rootfs size(Unit: MiB)."
         required: false
         default: "2748"
       armbian_fstype:
-        description: "Set armbian rootfs type."
+        description: "Set armbian rootfs type: ext4 / btrfs"
         required: false
         default: "ext4"
 

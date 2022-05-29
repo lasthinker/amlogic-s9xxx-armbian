@@ -1,5 +1,5 @@
 #==========================================================================
-# Description: Compile the Armbian kernel
+# Description: Compile the Armbian kernel for Amlogic
 # Copyright (C) 2021 https://github.com/lasthinker/amlogic-s9xxx-armbian
 #==========================================================================
 
