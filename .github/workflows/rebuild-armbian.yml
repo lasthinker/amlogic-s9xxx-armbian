@@ -14,21 +14,33 @@ on:
         required: false
         default: ""
       armbian_soc:
-        description: "Set Amlogic SoC."
+        description: "Select Amlogic SoC."
         required: false
         default: "s905x"
+        type: choice
+        options:
+          - all
+          - s905x
       armbian_kernel:
-        description: "Set kernel version."
+        description: "Select kernel version."
         required: false
-        default: "5.15.25"
+        default: "5.15.45"
+        type: choice
+        options:
+          - 5.4.195_5.10.120
+          - 5.15.45
       armbian_size:
         description: "Set armbian rootfs size(Unit: MiB)."
         required: false
         default: "2748"
       armbian_fstype:
-        description: "Set armbian rootfs type: ext4 / btrfs"
+        description: "Set armbian rootfs type."
         required: false
         default: "ext4"
+        type: choice
+        options:
+          - ext4
+          - btrfs
 
 env:
   TZ: Asia/Jakarta
