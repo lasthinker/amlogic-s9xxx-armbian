@@ -57,6 +57,8 @@ on:
         type: choice
         options:
           - 5.4.195_5.10.120
+          - 5.10.120_5.15.45
+          - 5.15.45_5.4.195
           - 5.15.45
       auto_kernel:
         description: "Auto use the latest kernel."
@@ -94,7 +96,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Initialization environment
+      - name: Initialization Environment
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
@@ -147,7 +149,7 @@ jobs:
           [[ -z "${set_armbian_sign}" ]] && set_armbian_sign="_${edition_name}"
           echo "ARMBIAN_CUSTOM_NAME=${set_armbian_sign}" >> $GITHUB_ENV
 
-      - name: Download source code
+      - name: Download Source Code
         id: down
         run: |
           git clone --depth 1 https://github.com/armbian/build.git
@@ -175,7 +177,7 @@ jobs:
           armbian_fstype: ${{ github.event.inputs.armbian_fstype }}
           armbian_sign: ${{ env.ARMBIAN_CUSTOM_NAME }}
 
-      - name: Upload Armbian image to Release
+      - name: Upload Armbian Image to Release
         uses: ncipollo/release-action@main
         if: env.PACKAGED_STATUS == 'success' && !cancelled()
         with:
@@ -184,10 +186,10 @@ jobs:
           allowUpdates: true
           token: ${{ secrets.GH_TOKEN }}
           body: |
-            This is Armbian image for Amlogic S905X
-            * Firmware information
-            Default username: root
-            Default password: 1234
-            Install command: armbian-install
-            Update command: armbian-update
+            This is Armbian Image for Amlogic S905X
+            * Firmware Information
+            Default Username: root
+            Default Password: 1234
+            Install to eMMC Command: armbian-install
+            Update Command: armbian-update
             Edition: ${{ env.ARMBIAN_DESKTOP_OPT }}

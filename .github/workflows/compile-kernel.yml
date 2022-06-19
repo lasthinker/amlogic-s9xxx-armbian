@@ -24,6 +24,8 @@ on:
         type: choice
         options:
           - 5.4.195_5.10.120
+          - 5.10.120_5.15.45
+          - 5.15.45_5.4.195
           - 5.15.45
       kernel_auto:
         description: "Auto use the latest kernel"
@@ -51,7 +53,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Initialization environment
+      - name: Initialization Environment
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
@@ -63,7 +65,7 @@ jobs:
           sudo timedatectl set-timezone "$TZ"
           echo "COMPILE_STARTINGTIME=$(date +"%m.%d.%H%M")" >> $GITHUB_ENV
 
-      - name: Compile the kernel for Amlogic S905X
+      - name: Compile the Kernel for Amlogic S905X
         uses: lasthinker/amlogic-s9xxx-armbian@main
         with:
           build_target: kernel
@@ -83,3 +85,4 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
           body: |
             The kernel can be used to compile Armbian and OpenWrt.
+            The kernel source code comes from: ${{ github.event.inputs.kernel_repo }}
