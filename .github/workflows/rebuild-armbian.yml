@@ -27,10 +27,10 @@ on:
         default: "5.15.45"
         type: choice
         options:
-          - 5.4.195_5.10.120
-          - 5.10.120_5.15.45
-          - 5.15.45_5.4.195
-          - 5.15.45
+          - 5.4.199_5.10.125
+          - 5.10.125_5.15.50
+          - 5.15.50_5.4.199
+          - 5.15.50
       armbian_size:
         description: "Set armbian rootfs size(Unit: MiB)."
         required: false
