@@ -55,7 +55,7 @@ on:
           - btrfs
 
 env:
-  TZ: Asia/Jakarta
+  TZ: America/New_York
 
 jobs:
   build:
