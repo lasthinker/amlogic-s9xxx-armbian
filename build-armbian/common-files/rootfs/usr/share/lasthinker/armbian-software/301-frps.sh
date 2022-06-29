@@ -7,7 +7,7 @@
 #
 # This file is a part of the Armbian for Amlogic
 #
-# Function: Execute software install/update/remove script
+# Function: Execute software install/update/uninstall script
 #
 # Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
 #

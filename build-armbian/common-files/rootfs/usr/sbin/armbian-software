@@ -7,7 +7,7 @@
 #
 # This file is a part of the Armbian for Amlogic
 #
-# Description: Third-party software install/update/remove management
+# Description: Third-party software install/update/uninstall management
 #
 # Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
 #
