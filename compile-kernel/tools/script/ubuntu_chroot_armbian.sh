@@ -7,7 +7,7 @@
 #
 # This file is a part of the Armbian for Amlogic
 #
-# Description: Run on Armbian, generate uinitrd
+# Description: Run on Armbian, generate uInitrd
 #
 # Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
 #
