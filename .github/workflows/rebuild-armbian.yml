@@ -39,7 +39,7 @@ on:
       armbian_size:
         description: "Set armbian rootfs size(Unit: MiB)."
         required: false
-        default: "2748"
+        default: "2560"
       armbian_fstype:
         description: "Set armbian rootfs type."
         required: false
@@ -66,6 +66,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Initialization Environment
+        id: init
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
@@ -74,9 +75,7 @@ jobs:
           sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/lasthinker/amlogic-s9xxx-armbian/main/compile-kernel/tools/script/ubuntu2204-build-armbian-depends)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
-          sudo timedatectl set-timezone "$TZ"
-          sudo mkdir -p /workdir
-          sudo chown $USER:$GROUPS /workdir
+          sudo timedatectl set-timezone "${TZ}"
 
           # Get the url of the rebuild armbian file
           armbian_url="${{ github.event.inputs.armbian_url }}"
@@ -92,11 +91,10 @@ jobs:
               fi
           fi
           echo "ARMBIAN_URL=${armbian_url}" >> $GITHUB_ENV
-          echo "COMPILE_STARTINGTIME=$(date +"%m.%d.%H%M")" >> $GITHUB_ENV
 
           # Get the release name of the rebuild armbian file
           set_release="_"
-          ARR_RELEASE=("jammy" "focal" "bullseye")
+          ARR_RELEASE=("jammy" "focal" "bullseye" "buster" "sid")
           i=1
           for r in ${ARR_RELEASE[*]}; do
               if [[ "${armbian_url}" == *"${r}"* ]]; then
@@ -106,6 +104,7 @@ jobs:
               let i++
           done
           echo "ARMBIAN_RELEASE=${set_release}" >> $GITHUB_ENV
+          echo "::set-output name=status::success"
 
       - name: Rebuild Armbian for Amlogic S905X
         uses: lasthinker/amlogic-s9xxx-armbian@main

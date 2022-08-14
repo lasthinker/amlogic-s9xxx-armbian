@@ -43,7 +43,7 @@ on:
       armbian_size:
         description: "Set armbian rootfs size(Unit: MiB)."
         required: false
-        default: "2748"
+        default: "2560"
       armbian_fstype:
         description: "Select armbian rootfs type."
         required: false
@@ -79,8 +79,7 @@ jobs:
           sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/lasthinker/amlogic-s9xxx-armbian/main/compile-kernel/tools/script/ubuntu2204-build-armbian-depends)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
-          sudo timedatectl set-timezone "$TZ"
-          echo "COMPILE_STARTINGTIME=$(date +"%m.%d.%H%M")" >> $GITHUB_ENV
+          sudo timedatectl set-timezone "${TZ}"
           echo "::set-output name=status::success"
 
       - name: Download Armbian from Releases
