@@ -21,10 +21,14 @@
 # query_version      : Query the latest kernel version
 #
 # get_kernel_source  : Get the kernel source code
-# env_check          : Check the environment for compile kernel
+# headers_install    : Deploy the kernel headers file
+# compile_env        : Set up the compile kernel environment
+# compile_dtbs       : Compile the dtbs
 # compile_kernel     : Compile the kernel
 # generate_uinitrd   : Generate initrd.img and uInitrd
-# packit_kernel      : Package the full set of kernel files
+# packit_dtbs        : Packit dtbs files
+# packit_kernel      : Packit boot, modules and header files
+# compile_selection  : Choose to compile dtbs or all kernels
 # clean_tmp          : Clear temporary files
 #
 # loop_recompile     : Loop to compile kernel
@@ -51,12 +55,14 @@ repo_branch="main"
 build_kernel=("5.15.25")
 auto_kernel="true"
 custom_name="-lasthinker"
+# Set the kernel compile object, options: dtbs / all
+package_list="all"
 #
 # Compile toolchain download mirror, run on Armbian
 dev_repo="https://github.com/ophub/kernel/releases/download/dev"
 #
 # Clang download from: https://github.com/llvm/llvm-project/releases
-clang_file="clang+llvm-14.0.0-aarch64-linux-gnu.tar.xz"
+clang_file="clang+llvm-14.0.6-aarch64-linux-gnu.tar.xz"
 #
 # Set font color
 STEPS="[\033[95m STEPS \033[0m]"
@@ -76,7 +82,7 @@ init_var() {
     cd ${make_path}
 
     # If it is followed by [ : ], it means that the option requires a parameter value
-    get_all_ver="$(getopt "dk:a:n:r:" "${@}")"
+    get_all_ver="$(getopt "dk:a:n:p:r:" "${@}")"
 
     while [[ -n "${1}" ]]; do
         case "${1}" in
@@ -84,6 +90,7 @@ init_var() {
             : ${build_kernel:="${build_kernel}"}
             : ${auto_kernel:="${auto_kernel}"}
             : ${custom_name:="${custom_name}"}
+            : ${package_list:="${package_list}"}
             : ${repo_owner:="${repo_owner}"}
             ;;
         -k | --kernel)
@@ -111,6 +118,14 @@ init_var() {
                 shift
             else
                 error_msg "Invalid -n parameter [ ${2} ]!"
+            fi
+            ;;
+        -p | --PackageList)
+            if [[ -n "${2}" ]]; then
+                package_list="${2}"
+                shift
+            else
+                error_msg "Invalid -p parameter [ ${2} ]!"
             fi
             ;;
         -r | --repo)
@@ -256,7 +271,38 @@ get_kernel_source() {
     sync
 }
 
-env_check() {
+headers_install() {
+    cd ${kernel_path}/${local_kernel_path}
+
+    # Set headers files list
+    head_list="$(mktemp)"
+    (
+        find . arch/${ARCH} -maxdepth 1 -name Makefile\*
+        find include scripts -type f -o -type l
+        find arch/${ARCH} -name Kbuild.platforms -o -name Platform
+        find $(find arch/${ARCH} -name include -o -name scripts -type d) -type f
+    ) >${head_list}
+
+    # Set object files list
+    obj_list="$(mktemp)"
+    {
+        [[ -n "$(grep "^CONFIG_OBJTOOL=y" include/config/auto.conf 2>/dev/null)" ]] && echo "tools/objtool/objtool"
+        find arch/${ARCH}/include Module.symvers include scripts -type f
+        [[ -n "$(grep "^CONFIG_GCC_PLUGINS=y" include/config/auto.conf 2>/dev/null)" ]] && find scripts/gcc-plugins -name \*.so
+    } >${obj_list}
+
+    # Install related files to the specified directory
+    tar --exclude '*.orig' -c -f - -C ${kernel_path}/${local_kernel_path} -T ${head_list} | tar -xf - -C ${out_kernel}/header
+    tar --exclude '*.orig' -c -f - -T ${obj_list} | tar -xf - -C ${out_kernel}/header
+
+    # copy .config manually to be where it's expected to be
+    cp .config ${out_kernel}/header/.config && sync
+
+    # Delete temporary files
+    rm -f ${head_list} ${obj_list} 2>/dev/null
+}
+
+compile_env() {
     cd ${make_path}
     echo -e "${STEPS} Start checking local compilation environments."
 
@@ -267,9 +313,7 @@ env_check() {
     # Create a temp directory
     rm -rf ${out_kernel}/{boot/,dtb/,modules/,header/,${kernel_version}/} 2>/dev/null && sync
     mkdir -p ${out_kernel}/{boot/,dtb/{allwinner/,amlogic/,rockchip/},modules/,header/,${kernel_version}/} && sync
-}
 
-compile_kernel() {
     cd ${kernel_path}/${local_kernel_path}
     echo -e "${STEPS} Set compilation parameters."
 
@@ -305,7 +349,7 @@ compile_kernel() {
     MAKE_SET_STRING=" ARCH=${ARCH} CC=${CC} LD=${LD} LLVM=1 LLVM_IAS=1 LOCALVERSION=${LOCALVERSION} "
 
     # Make clean/mrproper
-    make ${MAKE_SET_STRING} clean
+    make ${MAKE_SET_STRING} mrproper
 
     # Make menuconfig
     #make ${MAKE_SET_STRING} menuconfig
@@ -335,11 +379,27 @@ compile_kernel() {
         scripts/config -d LTO_CLANG_THIN
     fi
 
-    # Make kernel
-    echo -e "${STEPS} Start compilation kernel [ ${local_kernel_path} ]..."
+    # Set max process
     PROCESS="$(cat /proc/cpuinfo | grep "processor" | wc -l)"
     [[ -z "${PROCESS}" ]] && PROCESS="1" && echo "PROCESS: 1"
+}
+
+compile_dtbs() {
+    cd ${kernel_path}/${local_kernel_path}
+
+    # Make dtbs
+    echo -e "${STEPS} Start compilation dtbs [ ${local_kernel_path} ]..."
+    make ${MAKE_SET_STRING} dtbs -j${PROCESS}
+    [[ "${?}" -eq "0" ]] && echo -e "${SUCCESS} The dtbs is compiled successfully."
+}
+
+compile_kernel() {
+    cd ${kernel_path}/${local_kernel_path}
+
+    # Make kernel
+    echo -e "${STEPS} Start compilation kernel [ ${local_kernel_path} ]..."
     make ${MAKE_SET_STRING} Image modules dtbs -j${PROCESS}
+    #make ${MAKE_SET_STRING} bindeb-pkg KDEB_COMPRESS=xz KBUILD_DEBARCH=arm64 -j${PROCESS}
     [[ "${?}" -eq "0" ]] && echo -e "${SUCCESS} The kernel is compiled successfully."
 
     # Install modules
@@ -349,7 +409,7 @@ compile_kernel() {
 
     # Install headers
     echo -e "${STEPS} Install headers ..."
-    make ${MAKE_SET_STRING} INSTALL_HDR_PATH=${out_kernel}/header headers_install
+    headers_install
     [[ "${?}" -eq "0" ]] && echo -e "${SUCCESS} The headers is installed successfully."
 }
 
@@ -411,15 +471,9 @@ generate_uinitrd() {
     mv ${modules_backup_path}/* /usr/lib/modules && sync && rm -rf ${modules_backup_path}
 }
 
-packit_kernel() {
-    # Pack the kernel 6 files
-    echo -e "${STEPS} Packing the 6 [ ${kernel_outname} ] kernel packages..."
-
-    cd ${out_kernel}/boot
-    chmod +x *
-    tar -czf boot-${kernel_outname}.tar.gz * && sync
-    mv -f *.tar.gz ${out_kernel}/${kernel_version} && sync
-    echo -e "${SUCCESS} The [ boot-${kernel_outname}.tar.gz ] file is packaged."
+packit_dtbs() {
+    # Pack 3 dtbs files
+    echo -e "${STEPS} Packing the [ ${kernel_outname} ] dtbs packages..."
 
     cd ${out_kernel}/dtb/allwinner
     cp -f ${kernel_path}/${local_kernel_path}/arch/arm64/boot/dts/allwinner/*.dtb . && chmod +x * && sync
@@ -438,6 +492,17 @@ packit_kernel() {
     tar -czf dtb-rockchip-${kernel_outname}.tar.gz * && sync
     mv -f *.tar.gz ${out_kernel}/${kernel_version} && sync
     echo -e "${SUCCESS} The [ dtb-rockchip-${kernel_outname}.tar.gz ] file is packaged."
+}
+
+packit_kernel() {
+    # Pack 3 kernel files
+    echo -e "${STEPS} Packing the [ ${kernel_outname} ] boot, modules and header packages..."
+
+    cd ${out_kernel}/boot
+    chmod +x *
+    tar -czf boot-${kernel_outname}.tar.gz * && sync
+    mv -f *.tar.gz ${out_kernel}/${kernel_version} && sync
+    echo -e "${SUCCESS} The [ boot-${kernel_outname}.tar.gz ] file is packaged."
 
     cd ${out_kernel}/modules/lib/modules
     tar -czf modules-${kernel_outname}.tar.gz * && sync
@@ -448,7 +513,21 @@ packit_kernel() {
     tar -czf header-${kernel_outname}.tar.gz * && sync
     mv -f *.tar.gz ${out_kernel}/${kernel_version} && sync
     echo -e "${SUCCESS} The [ header-${kernel_outname}.tar.gz ] file is packaged."
+}
 
+compile_selection() {
+    # Compile by selection
+    if [[ "${package_list}" == "dtbs" ]]; then
+        compile_dtbs
+        packit_dtbs
+    else
+        compile_kernel
+        generate_uinitrd
+        packit_dtbs
+        packit_kernel
+    fi
+
+    # Add sha256sum integrity verification file
     cd ${out_kernel}/${kernel_version}
     sha256sum * >sha256sums && sync
     echo -e "${SUCCESS} The [ sha256sums ] file has been generated"
@@ -463,8 +542,9 @@ clean_tmp() {
     cd ${make_path}
     echo -e "${STEPS} Clear the space..."
 
-    rm -rf ${out_kernel}/{boot/,dtb/,modules/,header/,${kernel_version}/} 2>/dev/null && sync
+    rm -rf ${out_kernel}/{boot/,dtb/,modules/,header/,${kernel_version}/} 2>/dev/null
 
+    sync && sleep 3
     echo -e "${SUCCESS} All processes have been completed."
 }
 
@@ -494,10 +574,8 @@ loop_recompile() {
 
         # Execute the following functions in sequence
         get_kernel_source
-        env_check
-        compile_kernel
-        generate_uinitrd
-        packit_kernel
+        compile_env
+        compile_selection
         clean_tmp
 
         let j++
