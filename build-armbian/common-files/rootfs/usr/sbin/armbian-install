@@ -342,7 +342,7 @@ copy_rootfs() {
         sleep 3
         mount -t btrfs -o compress=zstd:6 ${PART_ROOT} ${DIR_INSTALL}
     else
-        mkfs.ext4 -F -q -U ${ROOTFS_UUID} -L "ROOTFS_EMMC" ${PART_ROOT}
+        mkfs.ext4 -F -q -U ${ROOTFS_UUID} -L "ROOTFS_EMMC" -b 4k -m 0 ${PART_ROOT}
         sleep 3
         mount -t ext4 ${PART_ROOT} ${DIR_INSTALL}
     fi
@@ -379,27 +379,14 @@ EOF
 
     echo -e "${INFO} Update the relevant parameters."
     lasthinker_release_file="${DIR_INSTALL}${lasthinker_release_file}"
-    #
-    sed -i '/FDTFILE/d' ${lasthinker_release_file} 2>/dev/null
-    echo "FDTFILE='${FDTFILE}'" >>${lasthinker_release_file} 2>/dev/null
-    #
-    sed -i '/UBOOT_OVERLOAD/d' ${lasthinker_release_file} 2>/dev/null
-    echo "UBOOT_OVERLOAD='${UBOOT_OVERLOAD}'" >>${lasthinker_release_file} 2>/dev/null
-    #
-    sed -i '/MAINLINE_UBOOT/d' ${lasthinker_release_file} 2>/dev/null
-    echo "MAINLINE_UBOOT='${MAINLINE_UBOOT}'" >>${lasthinker_release_file} 2>/dev/null
-    #
-    sed -i '/ANDROID_UBOOT/d' ${lasthinker_release_file} 2>/dev/null
-    echo "ANDROID_UBOOT='${ANDROID_UBOOT}'" >>${lasthinker_release_file} 2>/dev/null
-    #
-    sed -i '/MYBOX_UBOOT/d' ${lasthinker_release_file} 2>/dev/null
-    echo "MYBOX_UBOOT='${MYBOX_UBOOT}'" >>${lasthinker_release_file} 2>/dev/null
-    #
-    sed -i '/SOC/d' ${lasthinker_release_file} 2>/dev/null
-    echo "SOC='${AMLOGIC_SOC}'" >>${lasthinker_release_file} 2>/dev/null
-    #
-    sed -i '/K510/d' ${lasthinker_release_file} 2>/dev/null
-    echo "K510='${K510}'" >>${lasthinker_release_file} 2>/dev/null
+    sed -i "s|^FDTFILE=.*|FDTFILE='${FDTFILE}'|g" ${lasthinker_release_file} 2>/dev/null
+    sed -i "s|^UBOOT_OVERLOAD=.*|UBOOT_OVERLOAD='${UBOOT_OVERLOAD}'|g" ${lasthinker_release_file} 2>/dev/null
+    sed -i "s|^MAINLINE_UBOOT=.*|MAINLINE_UBOOT='${MAINLINE_UBOOT}'|g" ${lasthinker_release_file} 2>/dev/null
+    sed -i "s|^ANDROID_UBOOT=.*|ANDROID_UBOOT='${ANDROID_UBOOT}'|g" ${lasthinker_release_file} 2>/dev/null
+    sed -i "s|^MYBOX_UBOOT=.*|MYBOX_UBOOT='${MYBOX_UBOOT}'|g" ${lasthinker_release_file} 2>/dev/null
+    sed -i "s|^SOC=.*|SOC='${AMLOGIC_SOC}'|g" ${lasthinker_release_file} 2>/dev/null
+    sed -i "s|^K510=.*|K510='${K510}'|g" ${lasthinker_release_file} 2>/dev/null
+    sed -i "s|^DISK_TYPE=.*|DISK_TYPE='emmc'|g" ${lasthinker_release_file} 2>/dev/null
 
     rm -f ${DIR_INSTALL}/usr/sbin/armbian-tf 2>/dev/null
 

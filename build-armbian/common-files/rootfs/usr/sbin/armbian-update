@@ -64,7 +64,7 @@ check_depends() {
     necessary_packages=("subversion" "tar" "coreutils")
     i="1"
     for package in ${necessary_packages[*]}; do
-        [[ -n "$(dpkg-query -l | grep "${package}")" ]] || is_missing="1"
+        [[ -n "$(dpkg -l | grep "${package}")" ]] || is_missing="1"
         let i++
     done
 
@@ -161,7 +161,7 @@ download_kernel() {
             latest_version="$(curl -s "${kernel_api}" | grep "name" | grep -oE "${kernel_verpatch}.[0-9]+" | sed -e "s/${kernel_verpatch}.//g" | sort -n | sed -n '$p')"
             #latest_version="160"
             [[ ! -z "${latest_version}" ]] || error_msg "Failed to get the version on the server."
-            echo -e "${INFO} current version: ${current_kernel}, Latest version: ${kernel_verpatch}.${latest_version}"
+            echo -e "${INFO} Current version: ${current_kernel}, Latest version: ${kernel_verpatch}.${latest_version}"
             inputs_kernel="${kernel_verpatch}.${latest_version}"
         fi
 
@@ -186,7 +186,7 @@ check_kernel() {
     echo -e "${STEPS} Start checking the kernel..."
 
     # Determine custom kernel filename
-    kernel_boot="$(ls boot-${inputs_kernel}-*.tar.gz | head -n 1)"
+    kernel_boot="$(ls boot-${inputs_kernel}-*.tar.gz 2>/dev/null | head -n 1)"
     kernel_name="${kernel_boot/boot-/}" && kernel_name="${kernel_name/.tar.gz/}"
     KERNEL_VERSION="$(echo ${kernel_name} | grep -oE '^[1-9].[0-9]{1,3}.[0-9]+')"
     echo -e "${INFO} Kernel name: [ ${kernel_name} ]"
@@ -202,25 +202,25 @@ check_kernel() {
     sha256sums_file="sha256sums"
     sha256sums_check="1"
     [[ -s "${sha256sums_file}" && -n "$(cat ${sha256sums_file})" ]] || sha256sums_check="0"
-    [[ "${sha256sums_check}" -eq "1" ]] && echo -e "${INFO} Enable sha256sum checking..."
-
     # Loop check file
-    kernel_list=("boot" "dtb-amlogic" "header" "modules")
-    i="1"
-    for kernel_file in ${kernel_list[*]}; do
-        # Set check filename
-        tmp_file="${kernel_file}-${kernel_name}.tar.gz"
-        # Check if file exists
-        [[ -s "${tmp_file}" ]] || error_msg "The [ ${kernel_file} ] file is missing."
-        # Check if the file sha256sum is correct
-        if [[ "${sha256sums_check}" -eq "1" ]]; then
+    [[ "${sha256sums_check}" -eq "1" ]] && {
+        echo -e "${INFO} Enable sha256sum checking..."
+
+        kernel_list=("boot" "dtb-amlogic" "header" "modules")
+        i="1"
+        for kernel_file in ${kernel_list[*]}; do
+            # Set check filename
+            tmp_file="${kernel_file}-${kernel_name}.tar.gz"
+            # Check if file exists
+            [[ -s "${tmp_file}" ]] || error_msg "The [ ${kernel_file} ] file is missing."
+            # Check if the file sha256sum is correct
             tmp_sha256sum="$(sha256sum "${tmp_file}" | awk '{print $1}')"
             tmp_checkcode="$(cat ${sha256sums_file} | grep ${tmp_file} | awk '{print $1}')"
             [[ "${tmp_sha256sum}" == "${tmp_checkcode}" ]] || error_msg "${tmp_file}: sha256sum verification failed."
             echo -e "${INFO} (${i}/4) [ ${tmp_file} ] file sha256sum check same."
-        fi
-        let i++
-    done
+            let i++
+        done
+    }
 
     sync && echo ""
 }
@@ -248,17 +248,17 @@ update_kernel() {
     [[ "$(ls /boot/dtb/amlogic -l 2>/dev/null | grep "^-" | wc -l)" -ge "10" ]] || error_msg "/boot/dtb/amlogic file is missing."
     echo -e "${INFO} (2/4) Unpacking [ dtb-amlogic-${kernel_name}.tar.gz ] done."
 
-    # 03. For /usr/src/linux-5.x.y
-    header_path="$(echo ${inputs_kernel} | awk -F "." '{print "linux-"$1"."$2".y"}')"
-    rm -rf "/usr/src/linux-*" 2>/dev/null && mkdir -p "/usr/src/${header_path}" && sync
-    tar -xzf header-${kernel_name}.tar.gz -C /usr/src/${header_path} && sync
-    [[ -d "/usr/src/${header_path}/include" ]] || error_msg "/usr/src/${header_path}/include folder is missing."
+    # 03. For /usr/src/linux-headers-${kernel_name}
+    header_path="linux-headers-${kernel_name}"
+    rm -rf /usr/src/linux-headers-* 2>/dev/null && mkdir -p "/usr/src/${header_path}" && sync
+    tar -xzf header-${kernel_name}.tar.gz -C /usr/src/${header_path}
     echo -e "${INFO} (3/4) Unpacking [ header-${kernel_name}.tar.gz ] done."
+    [[ -d "/usr/src/${header_path}/include" ]] || error_msg "/usr/src/${header_path}/include folder is missing."
 
-    # 04. For /usr/lib/modules/*
+    # 04. For /usr/lib/modules/${kernel_name}
     rm -rf /usr/lib/modules/* 2>/dev/null && sync
     tar -xzf modules-${kernel_name}.tar.gz -C /usr/lib/modules && sync
-    (cd /usr/lib/modules/${kernel_name}/ && rm -f build source && ln -sf /usr/src/${header_path} build && ln -sf /usr/src/${header_path} source)
+    (cd /usr/lib/modules/${kernel_name}/ && rm -f build source 2>/dev/null && ln -sf /usr/src/${header_path} build)
     [[ -d "/usr/lib/modules/${kernel_name}" ]] || error_msg "/usr/lib/modules/${kernel_name} kernel folder is missing."
     echo -e "${INFO} (4/4) Unpacking [ modules-${kernel_name}.tar.gz ] done."
 
@@ -278,8 +278,6 @@ update_uboot() {
         [[ ! -f "/boot/u-boot.ext" ]] && cp -f "/boot/${UBOOT_OVERLOAD}" /boot/u-boot.ext && sync && chmod +x /boot/u-boot.ext
         [[ ! -f "/boot/u-boot.emmc" ]] && cp -f "/boot/u-boot.ext" /boot/u-boot.emmc && sync && chmod +x /boot/u-boot.emmc
         echo -e "${INFO} The ${UBOOT_OVERLOAD} file copy is complete."
-    elif [[ "${K510}" -eq "0" ]]; then
-        rm -f "/boot/u-boot.ext" "/boot/u-boot.emmc" 2>/dev/null
     fi
 
     # Write bootloader

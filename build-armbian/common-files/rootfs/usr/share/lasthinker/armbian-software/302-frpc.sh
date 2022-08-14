@@ -127,8 +127,8 @@ EOF
     # Set up to start automatically
     echo -e "${INFO} Start service..."
     sudo systemctl daemon-reload
-    sudo systemctl start frpc
-    sudo systemctl enable frpc
+    sudo systemctl enable --now frpc
+    sudo systemctl restart frpc
 
     echo -e "${PROMPT} Instructions for use:"
     cat <<EOF
@@ -174,8 +174,8 @@ software_update() {
 
     # Set up to start automatically
     sudo systemctl daemon-reload
-    sudo systemctl start frpc
-    sudo systemctl enable frpc
+    sudo systemctl enable --now frpc
+    sudo systemctl restart frpc
 
     echo -e "${SUCCESS} Software update successfully."
     exit 0
@@ -224,5 +224,3 @@ case "${1}" in
     remove)  software_remove ;;
     *)       software_help ;;
 esac
-
-exit 0

@@ -17,7 +17,7 @@
 #
 # error_msg               : Output error message
 # check_release           : Check firmware information
-# check_depends           : Check dependencies
+# check_depends           : Check runtime dependencies
 # check_software_status   : Initialize check
 # search_software_model   : Search for software model
 # show_software_list      : Display the software list
@@ -30,7 +30,6 @@
 # Related file storage path
 software_path="/usr/share/lasthinker/armbian-software"
 software_conf="${software_path}/software-list.conf"
-software_command="${software_path}/software-command.sh"
 lasthinker_release_file="/etc/lasthinker-release"
 arch_info="$(arch)"
 #
@@ -68,15 +67,15 @@ check_release() {
 check_depends() {
     # List of required dependencies
     dpkg_packages=(
-        "curl" "wget" "tar"
-        "subversion" "coreutils" "systemd"
-        "software-properties-common" "apt-transport-https" "ca-certificates"
+        "curl" "wget" "tar" "software-properties-common" "apt-transport-https" "ca-certificates"
+        "subversion" "coreutils" "systemd" "net-tools" "cpu-checker" "dnsmasq-base" "dmidecode"
     )
     # Cyclic check all dependencies
     is_dpkg="0"
     i="1"
     for package in ${dpkg_packages[*]}; do
-        [[ -n "$(dpkg-query -l | grep "${package}")" ]] || is_dpkg="1"
+        [[ -n "$(dpkg -l | grep "${package}")" ]] || is_dpkg="1"
+        #echo -e "${INFO} ${package}: ${is_dpkg}"
         let i++
     done
     # Install missing packages
@@ -107,7 +106,7 @@ check_software_status() {
         # Check the software installation status by category
         check_status="0"
         case "${auth_method}" in
-            dpkg)   [[ -n "$(dpkg-query -l | grep "${package}" 2>/dev/null)" ]] && check_status="1" ;;
+            dpkg)   [[ -n "$(dpkg -l | grep "${package}" 2>/dev/null)" ]] && check_status="1" ;;
             docker) [[ -n "$(docker ps -q -f name=${package} 2>/dev/null)" ]] && check_status="1" ;;
             which)  [[ -n "$(which "${package}" 2>/dev/null)" ]] && check_status="1" ;;
             *)      check_status="0" ;;
@@ -167,7 +166,7 @@ show_software_list() {
 
     # Display selected software information
     software_name="$(echo "${ret}" | awk -F ':' '{print $2}')"
-    software_command_shell="$(echo "${ret}" | awk -F ':' '{print $4}')"
+    software_execute="$(echo "${ret}" | awk -F ':' '{print $4}')"
     software_release="$(echo "${ret}" | awk -F ':' '{print $5}')"
     software_support="$(echo "${ret}" | awk -F ':' '{print $6}')"
     software_state="$(echo "${ret}" | awk -F ':' '{print $7}')"
@@ -188,25 +187,21 @@ show_software_list() {
         [[ "${optid:0:1}" == "u" ]] && software_manage="update" || software_manage="remove"
     }
 
-    echo -e "${STEPS} Start processing software: [ ${software_manage} ${software_name} ]..."
+    echo -e "${STEPS} Start processing software: [ ${software_execute} ${software_manage} ${software_name} ]..."
 
     # Perform software install/update/remove operations
-    if [[ "${software_command_shell}" == "command" ]]; then
-        # Execute by command
-        sudo ${software_command} -s ${software_id} -m ${software_manage}
+    if [[ "${software_execute}" == "command-"* ]]; then
+        # Execute fixed scripts
+        sudo bash ${software_path}/${software_execute} -s ${software_id} -m ${software_manage}
     else
-        # Execute by script
-        sudo ${software_path}/${software_command_shell} ${software_manage}
+        # Execute dedicated scripts
+        sudo bash ${software_path}/${software_execute} ${software_manage}
     fi
 }
 
 # Update related scripts and configuration files
 update_script() {
-    cd ${software_path}
     echo -e "${STEPS} Start update script..."
-
-    # Check dependencies
-    check_depends
 
     # Convert script repository address to svn format
     if [[ "${script_repo}" == http* && -n "$(echo ${script_repo} | grep "tree/main")" ]]; then
@@ -215,9 +210,8 @@ update_script() {
 
     # Update related files
     echo -e "${STEPS} Start syncing files..."
-    [[ -d "${software_path}" ]] || mkdir -p ${software_path}
     svn export ${script_repo} ${software_path} --force
-    chmod +x ${software_path}/*.sh
+    find ${software_path} -type f -name '*.sh' -exec chmod +x {} \;
 
     sync && sleep 3
     echo -e "${SUCCESS} Script update complete."
@@ -226,7 +220,6 @@ update_script() {
 
 # Clear software management related files
 clean_tmp() {
-    cd ${software_path}
     echo -e "${STEPS} Clear the space..."
 
     rm -rf ${software_path} 2>/dev/null && sync
@@ -255,9 +248,11 @@ EOF
 [[ "$(id -u)" == "0" ]] || error_msg "Please run this script as root: [ sudo $0 ]"
 [[ "${arch_info}" == "aarch64" ]] || error_msg "The script only supports running under Armbian system."
 # Check for the existence of software management scripts
-[[ -f "${software_command}" ]] || echo -e "${INFO} Please run [ armbian-software -u ] to update install software script."
+[[ -f "${software_conf}" ]] || echo -e "${INFO} Please run [ armbian-software -u ] to update install software script."
 # Check firmware information
 check_release
+# Check runtime dependencies
+check_depends
 
 # Execute script assist functions
 case "${1}" in
