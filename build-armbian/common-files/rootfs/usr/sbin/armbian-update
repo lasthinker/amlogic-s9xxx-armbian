@@ -292,10 +292,8 @@ update_uboot() {
     fi
 
     # Update lasthinker_release_file
-    sed -i '/KERNEL_VERSION/d' ${lasthinker_release_file} 2>/dev/null
-    echo "KERNEL_VERSION='${KERNEL_VERSION}'" >>${lasthinker_release_file} 2>/dev/null
-    sed -i '/K510/d' ${lasthinker_release_file} 2>/dev/null
-    echo "K510='${K510}'" >>${lasthinker_release_file} 2>/dev/null
+    sed -i "s|^KERNEL_VERSION=.*|KERNEL_VERSION='${KERNEL_VERSION}'|g" ${lasthinker_release_file} 2>/dev/null
+    sed -i "s|^K510=.*|K510='${K510}'|g" ${lasthinker_release_file} 2>/dev/null
 
     sync && echo ""
 }
