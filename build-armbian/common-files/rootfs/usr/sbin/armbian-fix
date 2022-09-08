@@ -41,7 +41,7 @@ lasthinker_release_file="/etc/lasthinker-release"
 [[ -f "/usr/libexec/sudo/sudoers.so" ]] && sudo chmod 644 /usr/libexec/sudo/sudoers.so && echo "13. Fix sudoers.so permissions"
 [[ -f "/usr/libexec/polkit-agent-helper-1" ]] && sudo chmod 4755 /usr/libexec/polkit-agent-helper-1 && echo "14. Fix polkit-agent-helper-1 permissions"
 # Fix custom banner name
-[[ -f "${ophub_release_file}" ]] && source "${ophub_release_file}"
+[[ -f "${lasthinker_release_file}" ]] && source "${ophub_release_file}"
 [[ -f "${armbian_release_file}" && -n "${SOC}" ]] && sed -i "s|BOARD_NAME=.*|BOARD_NAME=\"Aml ${SOC}\"|g" ${armbian_release_file} && echo "15. Fix custom banner name: Aml ${SOC}"
 
 # Remove packages
@@ -49,5 +49,13 @@ lasthinker_release_file="/etc/lasthinker-release"
 [[ -n "$(dpkg -l | grep linux-dtb-*)" ]] && sudo apt-get remove -qq --purge -y linux-dtb-* && echo "17. Remove linux-dtb-*"
 [[ -n "$(dpkg -l | grep linux-u-boot-*)" ]] && sudo apt-get remove -qq --purge -y linux-u-boot-* && echo "18. Remove linux-u-boot-*"
 sudo apt-get clean -y && sudo rm -rf /var/cache/apt/* && sudo rm -rf /var/lib/apt/* && echo "19. Clean up local installation packages"
+
+# Regenerate new machine-id
+sudo rm -f /etc/machine-id /var/lib/dbus/machine-id && echo "20. Delete machine-id"
+sudo dbus-uuidgen --ensure=/etc/machine-id && echo "21. Generate /etc/machine-id"
+sudo dbus-uuidgen --ensure && echo "22. Generate /var/lib/dbus/machine-id"
+
+# Turn off automatic hibernation to prevent hard drives from hanging
+sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target && echo "23. Turn off automatic sleep mode"
 
 sync && echo "armbian-fix: Loading finished."
