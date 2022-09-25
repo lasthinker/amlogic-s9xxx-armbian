@@ -547,6 +547,8 @@ refactor_files() {
     echo "KERNEL_VERSION='${kernel}'" >>${lasthinker_release_file} 2>/dev/null
     echo "SOC='${soc}'" >>${lasthinker_release_file} 2>/dev/null
     echo "K510='${K510}'" >>${lasthinker_release_file} 2>/dev/null
+    echo "ROOTFS_TYPE='${ROOTFS_TYPE}'" >>${lasthinker_release_file} 2>/dev/null
+    echo "BOOT_CONF='uEnv.txt'" >>${lasthinker_release_file} 2>/dev/null
     echo "DISK_TYPE='usb'" >>${lasthinker_release_file} 2>/dev/null
     echo "PACKAGED_DATE='$(date +%Y-%m-%d)'" >>${lasthinker_release_file} 2>/dev/null
 
