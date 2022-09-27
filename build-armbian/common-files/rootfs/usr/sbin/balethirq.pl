@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+# Copyright (C) 2021- https://github.com/lasthinker
 
 use strict;
 our %irq_map;
@@ -11,6 +12,8 @@ our $all_cpu_mask = 0;
 our $rpscpu_exclude_eth0_core=1;
 # Whether the rpscpu mask should exclude cores occupied by eth1 (0: no 1: yes)
 our $rpscpu_exclude_eth1_core=1;
+
+our $usb_as_eth1 = 0;
 
 &read_config();
 &read_irq_data();
@@ -35,6 +38,10 @@ sub read_config {
     open $fh, "<", $config_file or die $!;
     while(<$fh>) {
         chomp;
+        # Skip comment lines
+        next if(/^#/);
+        # Skip blank lines
+        next if(/^\s*$/);
         my($name, $value) = split;
         my @cpus = split(',', $value);
         # ARMV8 The current maximum number of CPU cores is 8 cores
@@ -77,21 +84,32 @@ sub get_cpu_count {
 sub read_irq_data {
     my $fh;
     open $fh, "<", "/proc/interrupts" or die $!;
+    my %local_map;
     while(<$fh>) {
         chomp;
         my @raw = split;
         my $irq = $raw[0];
         $irq =~ s/://;
         my $name = $raw[-1];
+	if(exists $local_map{$name}) {
+	    # r68s Have 2 pieces eth0 and 2 pieces eth1，Keep only Article 1
+	    next;
+	} else {
+	    $local_map{$name} = 1;
+	}
 
         if(exists $cpu_map{$name}) {
             $irq_map{$name} = $irq;
-            if($name =~ m/\Aeth[0-9]\Z/) {
-		# native ethX 
+            if($name =~ m/\Axhci-hcd:usb[1-9]\Z/) {
+		if (not exists $cpu_map{eth1}) {
+                    # For devices with a single network port，USB external network card as eth1
+		    $usb_as_eth1 = 1;
+                    $uniq_eth_cpu_map{eth1} =  1 << ($min_cpu_map{$name} - 1);
+	        } else {
+                    $uniq_eth_cpu_map{$name} =  1 << ($min_cpu_map{$name} - 1);
+		}
+            } else {
                 $uniq_eth_cpu_map{$name} = 1 << ($min_cpu_map{$name} - 1);
-            } elsif($name =~ m/\Axhci-hcd:usb[1-9]\Z/) { # usb extend eth1
-		# USB external network card: equivalent to eth1
-                $uniq_eth_cpu_map{eth1} =  1 << ($min_cpu_map{$name} - 1);
             }
         }
     }
@@ -145,8 +163,10 @@ sub tunning_eth_ring {
 
 sub enable_eth_rps_rfs {
     my $rps_sock_flow_entries = 0;
-    for my $eth ("eth0","eth1") {
-        if(-d "/sys/class/net/${eth}/queues/rx-0") {
+    for my $eth ("eth0","eth1","eth2","eth3","eth4","eth5","eth6") {
+	# RPS optimization is only for single-queue NICs，
+	# If it exists rx-1,Indicates that the network card supports RSS multiple queues，No need to optimize
+        if((-d "/sys/class/net/${eth}/queues/rx-0") && (! -d "/sys/class/net/${eth}/queues/rx-1")) {
             my $value = 32768;
             $rps_sock_flow_entries += $value;
             my $eth_cpu_mask_hex;
@@ -172,8 +192,10 @@ sub enable_eth_rps_rfs {
             print $fh $eth_cpu_mask_hex;
             close $fh;
 
-            # USB external network card: eth1 (RTL8153), the best rx_ring measured is in the range of 100-500, the default value is 100, after 500, the multi-CPU load will be unbalanced
-            &tunning_eth_ring($eth, 192, 0) if ($eth ne "eth0");
+	    if( ($eth eq "eth1") && ($usb_as_eth1 == 1) ) {
+                # USB external network card: eth1 (RTL8153), the best rx_ring measured is in the range of 100-500, the default value is 100, after 500, the multi-CPU load will be unbalanced
+	        &tunning_eth_ring($eth, 192, 0);
+            }
         }
     }
     open my $fh, ">", "/proc/sys/net/core/rps_sock_flow_entries" or die;
