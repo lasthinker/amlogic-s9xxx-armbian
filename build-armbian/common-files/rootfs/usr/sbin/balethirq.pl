@@ -19,6 +19,7 @@ our $usb_as_eth1 = 0;
 &read_irq_data();
 &update_smp_affinity();
 &enable_eth_rps_rfs();
+&board_special_config();
 exit(0);
 
 ############################## sub functions #########################
@@ -38,10 +39,10 @@ sub read_config {
     open $fh, "<", $config_file or die $!;
     while(<$fh>) {
         chomp;
-        # Skip comment lines
-        next if(/^#/);
-        # Skip blank lines
-        next if(/^\s*$/);
+	# Skip comment lines
+	next if(/^#/);
+	# Skip blank lines
+	next if(/^\s*$/);
         my($name, $value) = split;
         my @cpus = split(',', $value);
         # ARMV8 The current maximum number of CPU cores is 8 cores
@@ -101,7 +102,7 @@ sub read_irq_data {
         if(exists $cpu_map{$name}) {
             $irq_map{$name} = $irq;
             if($name =~ m/\Axhci-hcd:usb[1-9]\Z/) {
-		if (not exists $cpu_map{eth1}) {
+		if (not (exists $cpu_map{eth1} || exists $cpu_map{'eth1-0'}) ) {
                     # For devices with a single network port，USB external network card as eth1
 		    $usb_as_eth1 = 1;
                     $uniq_eth_cpu_map{eth1} =  1 << ($min_cpu_map{$name} - 1);
@@ -201,4 +202,24 @@ sub enable_eth_rps_rfs {
     open my $fh, ">", "/proc/sys/net/core/rps_sock_flow_entries" or die;
     print $fh $rps_sock_flow_entries;
     close $fh;
+}
+
+sub get_boardinfo() {
+    my $ret="unknown";
+    if(-f "/proc/device-tree/model") {
+         open my $fh, "<", "/proc/device-tree/model" or warn $!;
+	 read $fh, $ret, 100;
+	 close $fh;
+	 $ret =~ s/\0//;
+    }
+    return $ret;
+}
+
+sub board_special_config() {
+    my $board = &get_boardinfo();
+    if($board eq "FastRhino R68S") {
+        &tunning_eth_ring("eth2", 256, 256);
+    } elsif($board eq "FastRhino R66S") {
+        &tunning_eth_ring("eth0", 256, 256);
+    }
 }
