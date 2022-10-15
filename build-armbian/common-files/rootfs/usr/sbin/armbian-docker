@@ -77,10 +77,9 @@ EOF
     fi
 }
 
-
 # Install docker environment
 docker_install() {
-    echo -e "${STEPS} Initialize the docker installation environment... "
+    echo -e "${STEPS} Initialize the docker installation environment..."
 
     # Check release info
     check_release
@@ -103,7 +102,7 @@ docker_install() {
 
     echo -e "${STEPS} Install docker related packages..."
     sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
     echo -e "${STEPS} Install docker accelerator..."
     [[ -d "/etc/docker" ]] || mkdir -p /etc/docker
@@ -155,7 +154,7 @@ docker_remove() {
 
     # Remove the docker package
     sudo apt-get update
-    sudo apt-get remove --purge -y docker-ce docker-ce-cli containerd.io docker-compose docker-ce-*
+    sudo apt-get remove --purge -y docker-ce docker-ce-cli containerd.io docker-compose* docker-ce-*
     sudo apt-get --purge autoremove -y
     sudo apt-get autoclean -y
     #
