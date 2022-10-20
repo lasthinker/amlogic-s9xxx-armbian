@@ -1,16 +1,16 @@
 #==========================================================================
-# Description: Build Armbian For Amlogic
+# Description: Build Armbian for Amlogic
 # Copyright (C) 2021 https://github.com/lasthinker/amlogic-s9xxx-armbian
 #==========================================================================
 
-name: Rebuild armbian
+name: Rebuild Armbian
 
 on:
   repository_dispatch:
   workflow_dispatch:
     inputs:
       armbian_url:
-        description: "Set armbian path."
+        description: "Set Armbian Path."
         required: false
         default: ""
       armbian_soc:
@@ -22,7 +22,7 @@ on:
           - all
           - s905x
       armbian_kernel:
-        description: "Select kernel version."
+        description: "Select Kernel Version."
         required: false
         default: "5.15.45"
         type: choice
@@ -32,16 +32,16 @@ on:
           - 5.15.50_5.4.199
           - 5.15.50
       auto_kernel:
-        description: "Auto use the latest kernel."
+        description: "Auto Use Latest Kernel."
         required: false
         default: true
         type: boolean
       armbian_size:
-        description: "Set armbian rootfs size(Unit: MiB)."
+        description: "Set Armbian ROOTFS Size(Unit: MiB)."
         required: false
         default: "2560"
       armbian_fstype:
-        description: "Set armbian rootfs type."
+        description: "Set Armbian ROOTFS Type."
         required: false
         default: "ext4"
         type: choice
@@ -49,7 +49,7 @@ on:
           - ext4
           - btrfs
       armbian_sign:
-        description: "Set armbian custom name."
+        description: "Set Armbian Custom Name."
         required: false
         default: ""
 
@@ -59,7 +59,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    if: github.event.repository.owner.id == github.event.sender.id
+    if: ${{ github.event.repository.owner.id }} == ${{ github.event.sender.id }}
 
     steps:
       - name: Checkout
@@ -90,7 +90,7 @@ jobs:
                   exit 1
               fi
           fi
-          echo "ARMBIAN_URL=${armbian_url}" >> $GITHUB_ENV
+          echo "ARMBIAN_URL=${armbian_url}" >> ${GITHUB_ENV}
 
           # Get the release name of the rebuild armbian file
           set_release="_"
@@ -103,12 +103,12 @@ jobs:
               fi
               let i++
           done
-          echo "ARMBIAN_RELEASE=${set_release}" >> $GITHUB_ENV
-          echo "::set-output name=status::success"
+          echo "ARMBIAN_RELEASE=${set_release}" >> ${GITHUB_ENV}
+          echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Rebuild Armbian for Amlogic S905X
         uses: lasthinker/amlogic-s9xxx-armbian@main
-        if: env.ARMBIAN_URL != '' && !cancelled()
+        if: ${{ env.ARMBIAN_URL }} != '' && !cancelled()
         with:
           build_target: armbian
           armbian_path: ${{ env.ARMBIAN_URL }}
@@ -121,7 +121,7 @@ jobs:
 
       - name: Upload Armbian Image to Release
         uses: ncipollo/release-action@main
-        if: env.PACKAGED_STATUS == 'success' && !cancelled()
+        if: ${{ env.PACKAGED_STATUS }} == 'success' && !cancelled()
         with:
           tag: Armbian_Aml${{ env.ARMBIAN_RELEASE }}${{ env.PACKAGED_OUTPUTDATE }}
           artifacts: ${{ env.PACKAGED_OUTPUTPATH }}/*
@@ -132,5 +132,5 @@ jobs:
             * Firmware Information
             Default Username: root
             Default Password: 1234
-            Install to eMMC Command: armbian-install
+            Install Command: armbian-install
             Update Command: armbian-update
