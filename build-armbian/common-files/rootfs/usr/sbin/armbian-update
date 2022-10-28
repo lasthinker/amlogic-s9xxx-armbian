@@ -16,7 +16,7 @@
 # Command: armbian-update
 # Command optional parameters: armbian-update <kernel_version> <version_branch> <mainline_u-boot>
 # Mainline u-boot is not installed by default: armbian-update
-# Install mainline u-boot command: armbian-update 5.4.170 stable yes
+# Install mainline u-boot command: armbian-update 5.15.75 stable yes
 #
 #========================================= Functions list =========================================
 #
@@ -94,7 +94,7 @@ init_var() {
     cd ${tmp_path}
     echo -e "${STEPS} Start initializing the environment..."
 
-    # Specify the kernel, such as: 5.15.25
+    # Specify the kernel, such as: 5.15.75
     [[ -n "${1}" ]] && inputs_kernel="${1}"
 
     # Specify version branch, such as: stable

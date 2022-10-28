@@ -9,7 +9,7 @@
 #
 # Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
 #
-# Command: armbian-kernel -update && armbian-kernel -d -k 5.15.25
+# Command: armbian-kernel -update && armbian-kernel -d -k 5.15.75
 # Command optional parameters please refer to the source code repository
 #
 #================================= Functions list =================================
@@ -52,7 +52,7 @@ kernel_org_repo="https://cdn.kernel.org/pub/linux/kernel/v5.x/"
 # Set the default for downloading kernel sources from github.com
 repo_owner="lasthinker"
 repo_branch="main"
-build_kernel=("5.15.25")
+build_kernel=("5.15.75")
 auto_kernel="true"
 custom_name="-lasthinker"
 # Set the kernel compile object, options: dtbs / all
@@ -188,7 +188,7 @@ query_version() {
         MAIN_LINE="$(echo ${KERNEL_VAR} | awk -F '.' '{print $1"."$2}')"
 
         if [[ "${code_owner}" == "kernel.org" ]]; then
-            # latest_version="5.15.25"
+            # latest_version="5.15.75"
             latest_version="$(curl -s ${kernel_org_repo} | grep -oE linux-${MAIN_LINE}.[0-9]+.tar.xz | sort -rV | head -n 1 | grep -oE '[1-9].[0-9]{1,3}.[0-9]+')"
             if [[ "${?}" -eq "0" && -n "${latest_version}" ]]; then
                 tmp_arr_kernels[${i}]="${latest_version}"
@@ -545,7 +545,7 @@ loop_recompile() {
 
     j="1"
     for k in ${build_kernel[*]}; do
-        # kernel_version, such as [ 5.15.25 ]
+        # kernel_version, such as [ 5.15.75 ]
         kernel_version="${k}"
         # kernel_verpatch, such as [ 5.15 ]
         kernel_verpatch="$(echo ${kernel_version} | awk -F '.' '{print $1"."$2}')"
