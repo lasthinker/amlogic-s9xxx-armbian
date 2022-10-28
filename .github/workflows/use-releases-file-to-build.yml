@@ -89,9 +89,9 @@ jobs:
           armbian_buildpath="build/output/images"
           [[ -d "${armbian_buildpath}" ]] || mkdir -p "${armbian_buildpath}"
           down_repo="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases"
-          down_path="Armbian_Aml_${{ github.event.inputs.set_release }}.*/Armbian_.*-trunk_.*.img.gz"
+          down_path="armbian_aml_${{ github.event.inputs.set_release }}.*/Armbian_.*-trunk_.*.img.gz"
 
-          # down_filename: Armbian_Aml_bullseye_gnome_desktop_05.17.1924/Armbian_22.05.0-trunk_Odroidn2_bullseye_current_5.10.110.img.gz
+          # down_filename: armbian_aml_bullseye_gnome_desktop_05.17.1924/Armbian_22.05.0-trunk_Odroidn2_bullseye_current_5.10.110.img.gz
           down_filename="$(curl -s "${down_repo}" | grep -oE "${down_path}" | head -n 1)"
           down_file="https://github.com/${GITHUB_REPOSITORY}/releases/download/${down_filename}"
           [[ -z "${down_file}" ]] && echo "Invalid download file." && exit 1
@@ -118,7 +118,7 @@ jobs:
         uses: ncipollo/release-action@main
         if: ${{ env.PACKAGED_STATUS }} == 'success' && !cancelled()
         with:
-          tag: Armbian_Aml_${{ env.ARMBIAN_RELEASE }}_${{ env.PACKAGED_OUTPUTDATE }}
+          tag: armbian_aml_${{ env.ARMBIAN_RELEASE }}_${{ env.PACKAGED_OUTPUTDATE }}
           artifacts: ${{ env.PACKAGED_OUTPUTPATH }}/*
           allowUpdates: true
           token: ${{ secrets.GH_TOKEN }}
