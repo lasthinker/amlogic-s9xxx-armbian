@@ -56,7 +56,7 @@ on:
         default: ""
 
 env:
-  TZ: America/New_York
+  TZ: Asia/Jakarta
 
 jobs:
   build:
