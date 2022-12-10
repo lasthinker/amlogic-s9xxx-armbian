@@ -29,7 +29,7 @@ ERROR="[\033[91m ERROR \033[0m]"
 
 # Install the required dependencies
 chroot_env_init() {
-    [[ -n "$(dpkg -l | grep "initramfs-tools")" ]] || {
+    [[ -n "$(dpkg -l | awk '{print $2}' | grep -w "^initramfs-tools$")" ]] || {
         echo -e "${STEPS} Install the required dependencies..."
         sudo apt-get update -y
         sudo apt-get install -y initramfs-tools
@@ -42,14 +42,12 @@ chroot_generate_uinitrd() {
     echo -e "${STEPS} Generate uInitrd file..."
     #echo -e "${INFO} File status in the /boot directory before the update: \n$(ls -l .) \n"
 
-    cp -f vmlinuz-${chroot_kernel_version} zImage 2>/dev/null && sync
-
     # Generate uInitrd file directly under armbian system
     update-initramfs -c -k ${chroot_kernel_version} 2>/dev/null
 
     if [[ -f "uInitrd" ]]; then
         echo -e "${SUCCESS} The initrd.img and uInitrd file is Successfully generated."
-        mv -f uInitrd uInitrd-${chroot_kernel_version}
+        mv -f uInitrd uInitrd-${chroot_kernel_version} 2>/dev/null
         sync && sleep 3
     else
         echo -e "${WARNING} The initrd.img and uInitrd file not updated."

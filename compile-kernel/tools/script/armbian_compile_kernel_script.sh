@@ -9,7 +9,7 @@
 #
 # Copyright (C) 2021- https://github.com/lasthinker/amlogic-s9xxx-armbian
 #
-# Command: armbian-kernel -update && armbian-kernel -d -k 5.15.75
+# Command: armbian-kernel -update && armbian-kernel -k 5.15.75
 # Command optional parameters please refer to the source code repository
 #
 #================================= Functions list =================================
@@ -42,6 +42,9 @@ kernel_path="${compile_path}/kernel"
 config_path="${compile_path}/tools/config"
 script_path="${compile_path}/tools/script"
 out_kernel="${compile_path}/output"
+#
+# Set the release check file
+lasthinker_release_file="/etc/lasthinker-release"
 arch_info="$(arch)"
 host_release="$(cat /etc/os-release | grep VERSION_CODENAME | cut -d"=" -f2)"
 toolchain_path="/usr/local/toolchain"
@@ -62,7 +65,7 @@ package_list="all"
 dev_repo="https://github.com/ophub/kernel/releases/download/dev"
 #
 # Clang download from: https://github.com/llvm/llvm-project/releases
-clang_file="clang+llvm-15.0.0-aarch64-linux-gnu.tar.xz"
+clang_file="clang+llvm-14.0.0-aarch64-linux-gnu.tar.xz"
 #
 # Set font color
 STEPS="[\033[95m STEPS \033[0m]"
@@ -79,20 +82,13 @@ error_msg() {
 }
 
 init_var() {
-    cd ${make_path}
+    echo -e "${STEPS} Start Initializing Variables..."
 
     # If it is followed by [ : ], it means that the option requires a parameter value
-    get_all_ver="$(getopt "dk:a:n:p:r:" "${@}")"
+    get_all_ver="$(getopt "k:a:n:p:r:" "${@}")"
 
     while [[ -n "${1}" ]]; do
         case "${1}" in
-        -d | --default)
-            : ${build_kernel:="${build_kernel}"}
-            : ${auto_kernel:="${auto_kernel}"}
-            : ${custom_name:="${custom_name}"}
-            : ${package_list:="${package_list}"}
-            : ${repo_owner:="${repo_owner}"}
-            ;;
         -k | --kernel)
             if [[ -n "${2}" ]]; then
                 oldIFS=$IFS
@@ -152,11 +148,26 @@ init_var() {
     #
     [[ -n "${code_owner}" ]] || error_msg "The [ -r ] parameter is invalid."
     [[ -n "${code_branch}" ]] || code_branch="${repo_branch}"
+
+    # Check release file
+    [[ -f "${lasthinker_release_file}" ]] || error_msg "missing [ ${lasthinker_release_file} ] file."
+
+    # Get values
+    source "${lasthinker_release_file}"
+    PLATFORM="${PLATFORM}"
+    FDTFILE="${FDTFILE}"
+
+    # Early devices did not add platform parameters, auto-completion
+    [[ -z "${PLATFORM}" && -n "${FDTFILE}" ]] && {
+        [[ ${FDTFILE:0:5} == "meson" ]] && PLATFORM="amlogic" || PLATFORM="rockchip"
+        echo "PLATFORM='${PLATFORM}'" >>${lasthinker_release_file}
+    }
+    echo -e "${INFO} Armbian PLATFORM: [ ${PLATFORM} ]"
 }
 
 toolchain_check() {
     cd ${make_path}
-    echo -e "${STEPS} Check the cross-compilation environment ..."
+    echo -e "${STEPS} Start checking the toolchain for compiling the kernel..."
 
     # Install dependencies
     sudo apt-get -qq update
@@ -177,6 +188,8 @@ toolchain_check() {
 
 query_version() {
     cd ${make_path}
+    echo -e "${STEPS} Start querying the latest kernel version..."
+
     # Set empty array
     tmp_arr_kernels=()
 
@@ -220,8 +233,9 @@ query_version() {
 
 get_kernel_source() {
     cd ${make_path}
+    echo -e "${STEPS} Start downloading the kernel source code..."
+
     # kernel_folder > kernel_.tar.xz_file > download_from_kernel.org
-    echo -e "${STEPS} Start query and download the kernel."
     [[ -d "${kernel_path}" ]] || mkdir -p ${kernel_path}
     if [[ ! -d "${kernel_path}/${local_kernel_path}" ]]; then
         if [[ "${code_owner}" == "kernel.org" ]]; then
@@ -296,10 +310,10 @@ headers_install() {
     tar --exclude '*.orig' -c -f - -T ${obj_list} | tar -xf - -C ${out_kernel}/header
 
     # copy .config manually to be where it's expected to be
-    cp .config ${out_kernel}/header/.config
+    cp -f .config ${out_kernel}/header/.config
 
     # Delete temporary files
-    rm -f ${head_list} ${obj_list} 2>/dev/null
+    rm -f ${head_list} ${obj_list}
 }
 
 compile_env() {
@@ -311,7 +325,7 @@ compile_env() {
     echo -e "${INFO} Compile kernel output name [ ${kernel_outname} ]. \n"
 
     # Create a temp directory
-    rm -rf ${out_kernel}/{boot/,dtb/,modules/,header/,${kernel_version}/} 2>/dev/null
+    rm -rf ${out_kernel}/{boot/,dtb/,modules/,header/,${kernel_version}/}
     mkdir -p ${out_kernel}/{boot/,dtb/{allwinner/,amlogic/,rockchip/},modules/,header/,${kernel_version}/}
 
     cd ${kernel_path}/${local_kernel_path}
@@ -416,11 +430,13 @@ generate_uinitrd() {
     echo -e "${INFO} Backup the files in the [ /boot ] directory."
     boot_backup_path="/boot/backup"
     rm -rf ${boot_backup_path} && mkdir -p ${boot_backup_path}
-    mv -f /boot/{config-*,initrd.img-*,System.map-*,uInitrd-*,vmlinuz-*,uInitrd,zImage} ${boot_backup_path} 2>/dev/null
+    mv -f /boot/{config-*,initrd.img-*,System.map-*,uInitrd-*,vmlinuz-*,uInitrd,zImage,Image} ${boot_backup_path} 2>/dev/null
     # Copy /boot related files into armbian system
     cp -f ${kernel_path}/${local_kernel_path}/System.map /boot/System.map-${kernel_outname}
     cp -f ${kernel_path}/${local_kernel_path}/.config /boot/config-${kernel_outname}
     cp -f ${kernel_path}/${local_kernel_path}/arch/arm64/boot/Image /boot/vmlinuz-${kernel_outname}
+    [[ "${PLATFORM}" == "amlogic" ]] && cp -f /boot/vmlinuz-${kernel_outname} /boot/zImage
+    [[ "${PLATFORM}" == "rockchip" ]] && ln -sf vmlinuz-${kernel_outname} /boot/Image
     #echo -e "${INFO} Kernel copy results in the [ /boot ] directory: \n$(ls -l /boot) \n"
 
     # Backup current system files for /usr/lib/modules
@@ -439,9 +455,6 @@ generate_uinitrd() {
 
     cd /boot
     echo -e "${STEPS} Generate uInitrd file..."
-    #echo -e "${INFO} File status in the /boot directory before the update: \n$(ls -l .) \n"
-
-    cp -f vmlinuz-${kernel_outname} zImage 2>/dev/null
 
     # Generate uInitrd file directly under armbian system
     update-initramfs -c -k ${kernel_outname} 2>/dev/null
@@ -460,8 +473,8 @@ generate_uinitrd() {
     mv -f ${boot_backup_path}/* . && rm -rf ${boot_backup_path}
 
     # Restore the files in the [ /usr/lib/modules ] directory
-    rm -rf /usr/lib/modules/${kernel_outname} 2>/dev/null
-    mv ${modules_backup_path}/* /usr/lib/modules && rm -rf ${modules_backup_path}
+    rm -rf /usr/lib/modules/${kernel_outname}
+    mv -f ${modules_backup_path}/* /usr/lib/modules && rm -rf ${modules_backup_path}
 }
 
 packit_dtbs() {
@@ -535,7 +548,7 @@ clean_tmp() {
     cd ${make_path}
     echo -e "${STEPS} Clear the space..."
 
-    rm -rf ${out_kernel}/{boot/,dtb/,modules/,header/,${kernel_version}/} 2>/dev/null
+    rm -rf ${out_kernel}/{boot/,dtb/,modules/,header/,${kernel_version}/}
 
     echo -e "${SUCCESS} All processes have been completed."
 }
@@ -578,23 +591,24 @@ loop_recompile() {
 [[ "$(id -u)" == "0" ]] || error_msg "Please run this script as root: [ sudo ./${0} ]"
 [[ "${arch_info}" == "aarch64" ]] || error_msg "The script only supports running under Armbian system."
 # Show welcome and server start information
-echo -e "Welcome to compile kernel! \n"
-echo -e "Server running on Armbian: [ Release: ${host_release} / Host: ${arch_info} ] \n"
-echo -e "Server running path [ ${make_path} ] \n"
-echo -e "Server CPU configuration information: \n$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
-echo -e "Server memory usage: \n$(free -h) \n"
-echo -e "Server space usage before starting to compile: \n$(df -hT ${make_path}) \n"
+echo -e "${STEPS} Welcome to compile kernel! \n"
+echo -e "${INFO} Server running on Armbian: [ Release: ${host_release} / Host: ${arch_info} ] \n"
+echo -e "${INFO} Server running path [ ${make_path} ] \n"
+echo -e "${INFO} Server CPU configuration information: \n$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
+echo -e "${INFO} Server memory usage: \n$(free -h) \n"
+echo -e "${INFO} Server space usage before starting to compile: \n$(df -hT ${make_path}) \n"
 #
 # Initialize variables, download the kernel source code and check the toolchain
 init_var "${@}"
 [[ "${auto_kernel}" == "true" ]] && query_version
-echo -e "Kernel from: [ ${code_owner} ]"
-echo -e "Kernel List: [ $(echo ${build_kernel[*]} | tr "\n" " ") ] \n"
+echo -e "${INFO} Kernel from: [ ${code_owner} ]"
+echo -e "${INFO} Kernel List: [ $(echo ${build_kernel[*]} | tr "\n" " ") ] \n"
 toolchain_check
 # Loop to compile the kernel
 loop_recompile
 #
 # Show server end information
-echo -e "${INFO} Server space usage after compilation: \n$(df -hT ${make_path}) \n"
+echo -e "${STEPS} Server space usage after compilation: \n$(df -hT ${make_path}) \n"
+echo -e "${SUCCESS} All process completed successfully."
 # All process completed
 wait

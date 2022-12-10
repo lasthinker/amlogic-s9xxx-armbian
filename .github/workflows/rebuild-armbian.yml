@@ -13,8 +13,8 @@ on:
         description: "Set Armbian Path."
         required: false
         default: ""
-      armbian_soc:
-        description: "Select Amlogic SoC."
+      armbian_board:
+        description: "Select Amlogic Board."
         required: false
         default: "s905x"
         type: choice
@@ -73,14 +73,15 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc 2>/dev/null
-          sudo -E apt-get -qq update
+          sudo -E apt-get -qq update -y
+          sudo -E apt-get -qq full-upgrade -y
           sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/lasthinker/amlogic-s9xxx-armbian/main/compile-kernel/tools/script/ubuntu2204-build-armbian-depends)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
           sudo timedatectl set-timezone "${TZ}"
 
           # Get the url of the rebuild armbian file
-          armbian_url="${{ github.event.inputs.armbian_url }}"
+          armbian_url="${{ inputs.armbian_url }}"
           if  [[ -z "${armbian_url}" ]]; then
               armbian_site="https://armbian.tnahosting.net/dl/odroidn2/archive/"
               armbian_name="Armbian.*jammy.*.img.xz"
@@ -114,18 +115,18 @@ jobs:
         with:
           build_target: armbian
           armbian_path: ${{ env.ARMBIAN_URL }}
-          armbian_soc: ${{ github.event.inputs.armbian_soc }}
-          armbian_kernel: ${{ github.event.inputs.armbian_kernel }}
-          auto_kernel: ${{ github.event.inputs.auto_kernel }}
-          armbian_size: ${{ github.event.inputs.armbian_size }}
-          armbian_fstype: ${{ github.event.inputs.armbian_fstype }}
-          armbian_sign: ${{ github.event.inputs.armbian_sign }}
+          armbian_board: ${{ inputs.armbian_board }}
+          armbian_kernel: ${{ inputs.armbian_kernel }}
+          auto_kernel: ${{ inputs.auto_kernel }}
+          armbian_size: ${{ inputs.armbian_size }}
+          armbian_fstype: ${{ inputs.armbian_fstype }}
+          armbian_sign: ${{ inputs.armbian_sign }}
 
       - name: Upload Armbian Image to Release
         uses: ncipollo/release-action@main
         if: ${{ env.PACKAGED_STATUS }} == 'success' && !cancelled()
         with:
-          tag: armbian_aml${{ env.ARMBIAN_RELEASE }}${{ env.PACKAGED_OUTPUTDATE }}
+          tag: Armbian${{ env.ARMBIAN_RELEASE }}${{ env.PACKAGED_OUTPUTDATE }}
           artifacts: ${{ env.PACKAGED_OUTPUTPATH }}/*
           allowUpdates: true
           token: ${{ secrets.GH_TOKEN }}

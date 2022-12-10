@@ -17,8 +17,8 @@ on:
         options:
           - jammy
           - bullseye
-      armbian_soc:
-        description: "Select Amlogic SoC."
+      armbian_board:
+        description: "Select Box Board."
         required: false
         default: "s905x"
         type: choice
@@ -77,12 +77,13 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc 2>/dev/null
-          sudo -E apt-get -qq update
+          sudo -E apt-get -qq update -y
+          sudo -E apt-get -qq full-upgrade -y
           sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/lasthinker/amlogic-s9xxx-armbian/main/compile-kernel/tools/script/ubuntu2204-build-armbian-depends)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
           sudo timedatectl set-timezone "${TZ}"
-          echo "ARMBIAN_RELEASE=${{ github.event.inputs.set_release }}" >> ${GITHUB_ENV}
+          echo "ARMBIAN_RELEASE=${{ inputs.set_release }}" >> ${GITHUB_ENV}
           echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Download Source Code
@@ -99,9 +100,22 @@ jobs:
           # Compile method and parameter description: https://docs.armbian.com/Developer-Guide_Build-Options
           cd build/
           sudo ./compile.sh RELEASE=${{ env.ARMBIAN_RELEASE }} BOARD=odroidn2 BRANCH=current BUILD_DESKTOP=no HOST=armbian EXPERT=yes \
-                            BUILD_MINIMAL=no KERNEL_ONLY=no KERNEL_CONFIGURE=no CLEAN_LEVEL=make,debs COMPRESS_OUTPUTIMAGE="sha,gz"
-          echo "build_tag=armbian_aml_${{ env.ARMBIAN_RELEASE }}_$(date +"%m.%d.%H%M")" >> ${GITHUB_OUTPUT}
+                            BUILD_MINIMAL=no KERNEL_ONLY=no KERNEL_CONFIGURE=no CLEAN_LEVEL=make,debs COMPRESS_OUTPUTIMAGE="sha"
+          echo "build_tag=Armbian_${{ env.ARMBIAN_RELEASE }}_$(date +"%m.%d.%H%M")" >> ${GITHUB_OUTPUT}
           echo "status=success" >> ${GITHUB_OUTPUT}
+
+      - name: Clean Up Server Space
+        if: ${{ steps.compile.outputs.status }} == 'success' && !cancelled()
+        run: |
+          cd build/
+            sudo rm -rf $(ls . | grep -v "^output$" | xargs) 2>/dev/null
+          cd output/images/
+            img_name="$(ls *.img | head -n 1)"
+            img_version="$(echo ${img_name} | grep -oE '[2-9][2-9]\.[0-9]{1,2}\.[0-9]{1,2}' | head -n 1)"
+            img_kernel="$(echo ${img_name} | grep -oE '[5-9]\.[0-9]{1,2}\.[0-9]{1,3}' | head -n 1)"
+            sudo mv -f ${img_name} Armbian_${img_version}-trunk_${img_kernel}.img
+            sudo pigz -9f *.img
+            df -hT ${PWD}
 
       - name: Upload Armbian Image to Release
         uses: ncipollo/release-action@main
@@ -118,12 +132,12 @@ jobs:
         with:
           build_target: armbian
           armbian_path: build/output/images/*.img.gz
-          armbian_soc: ${{ github.event.inputs.armbian_soc }}
-          armbian_kernel: ${{ github.event.inputs.armbian_kernel }}
-          auto_kernel: ${{ github.event.inputs.auto_kernel }}
-          armbian_size: ${{ github.event.inputs.armbian_size }}
-          armbian_fstype: ${{ github.event.inputs.armbian_fstype }}
-          armbian_sign: ${{ github.event.inputs.armbian_sign }}
+          armbian_board: ${{ inputs.armbian_board }}
+          armbian_kernel: ${{ inputs.armbian_kernel }}
+          auto_kernel: ${{ inputs.auto_kernel }}
+          armbian_size: ${{ inputs.armbian_size }}
+          armbian_fstype: ${{ inputs.armbian_fstype }}
+          armbian_sign: ${{ inputs.armbian_sign }}
 
       - name: Upload Rebuild Image to Release
         uses: ncipollo/release-action@main

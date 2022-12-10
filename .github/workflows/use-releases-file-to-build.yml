@@ -17,8 +17,8 @@ on:
         options:
           - jammy
           - bullseye
-      armbian_soc:
-        description: "Select Amlogic SoC."
+      armbian_board:
+        description: "Select Box Board."
         required: false
         default: "s905x"
         type: choice
@@ -77,7 +77,8 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc 2>/dev/null
-          sudo -E apt-get -qq update
+          sudo -E apt-get -qq update -y
+          sudo -E apt-get -qq full-upgrade -y
           sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/lasthinker/amlogic-s9xxx-armbian/main/compile-kernel/tools/script/ubuntu2204-build-armbian-depends)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
@@ -91,16 +92,16 @@ jobs:
           armbian_buildpath="build/output/images"
           [[ -d "${armbian_buildpath}" ]] || mkdir -p "${armbian_buildpath}"
           down_repo="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases"
-          down_path="armbian_aml_${{ github.event.inputs.set_release }}.*/Armbian_.*-trunk_.*.img.gz"
+          down_path="Armbian_${{ inputs.set_release }}.*/Armbian_.*-trunk_.*.img.gz"
 
-          # down_filename: armbian_aml_bullseye_gnome_desktop_05.17.1924/Armbian_22.05.0-trunk_Odroidn2_bullseye_current_5.10.110.img.gz
+          # down_filename: Armbian_jammy_11.18.2336/Armbian_22.11.0-trunk_5.10.70.img.gz
           down_filename="$(curl -s "${down_repo}" | grep -oE "${down_path}" | head -n 1)"
           down_file="https://github.com/${GITHUB_REPOSITORY}/releases/download/${down_filename}"
           [[ -z "${down_file}" ]] && echo "Invalid download file." && exit 1
           wget -q -P "${armbian_buildpath}" "${down_file}" && sync
           cd "${armbian_buildpath}" && gzip -df *.img.gz && sync
 
-          echo "ARMBIAN_RELEASE=${{ github.event.inputs.set_release }}" >> ${GITHUB_ENV}
+          echo "ARMBIAN_RELEASE=${{ inputs.set_release }}" >> ${GITHUB_ENV}
           echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Rebuild Armbian [ ${{ env.ARMBIAN_RELEASE }} ]
@@ -109,18 +110,18 @@ jobs:
         with:
           build_target: armbian
           armbian_path: build/output/images/*.img
-          armbian_soc: ${{ github.event.inputs.armbian_soc }}
-          armbian_kernel: ${{ github.event.inputs.armbian_kernel }}
-          auto_kernel: ${{ github.event.inputs.auto_kernel }}
-          armbian_size: ${{ github.event.inputs.armbian_size }}
-          armbian_fstype: ${{ github.event.inputs.armbian_fstype }}
-          armbian_sign: ${{ github.event.inputs.armbian_sign }}
+          armbian_board: ${{ inputs.armbian_board }}
+          armbian_kernel: ${{ inputs.armbian_kernel }}
+          auto_kernel: ${{ inputs.auto_kernel }}
+          armbian_size: ${{ inputs.armbian_size }}
+          armbian_fstype: ${{ inputs.armbian_fstype }}
+          armbian_sign: ${{ inputs.armbian_sign }}
 
       - name: Upload Armbian Image to Release
         uses: ncipollo/release-action@main
         if: ${{ env.PACKAGED_STATUS }} == 'success' && !cancelled()
         with:
-          tag: armbian_aml_${{ env.ARMBIAN_RELEASE }}_${{ env.PACKAGED_OUTPUTDATE }}
+          tag: Armbian_${{ env.ARMBIAN_RELEASE }}_${{ env.PACKAGED_OUTPUTDATE }}
           artifacts: ${{ env.PACKAGED_OUTPUTPATH }}/*
           allowUpdates: true
           token: ${{ secrets.GH_TOKEN }}
