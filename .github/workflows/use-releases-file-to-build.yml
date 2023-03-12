@@ -81,13 +81,15 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           docker rmi `docker images -q`
+          [[ -n "${AGENT_TOOLSDIRECTORY}" ]] && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
           sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android 2>/dev/null
-          sudo -E apt-get -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* adoptopenjdk* mongodb* dotnet* moby* snapd* || true
-          sudo -E apt-get -qq update -y
-          sudo -E apt-get -qq full-upgrade -y
-          sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/lasthinker/amlogic-s9xxx-armbian/main/compile-kernel/tools/script/ubuntu2204-build-armbian-depends)
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
+          sudo -E apt-get -y update
+          sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
+          sudo -E apt-get -y install $(curl -fsSL https://raw.githubusercontent.com/lasthinker/amlogic-s9xxx-armbian/main/compile-kernel/tools/script/ubuntu2204-build-armbian-depends)
+          sudo -E systemctl daemon-reload
+          #sudo -E apt-get -y full-upgrade
+          sudo -E apt-get -y autoremove --purge
+          sudo -E apt-get clean
           sudo timedatectl set-timezone "${TZ}"
           echo "status=success" >> ${GITHUB_OUTPUT}
 
@@ -97,13 +99,17 @@ jobs:
         run: |
           armbian_buildpath="build/output/images"
           [[ -d "${armbian_buildpath}" ]] || mkdir -p "${armbian_buildpath}"
-          down_repo="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases"
-          down_path="Armbian_${{ inputs.set_release }}.*/Armbian_.*-trunk_.*.img.gz"
 
-          # down_filename: Armbian_jammy_11.18.2336/Armbian_22.11.0-trunk_5.10.70.img.gz
-          down_filename="$(curl --header "authorization: Bearer ${{ secrets.GH_TOKEN }}" -s "${down_repo}" | grep -oE "${down_path}" | head -n 1)"
+          down_filename="$(curl \
+                            --header "authorization: Bearer ${{ secrets.GH_TOKEN }}" \
+                            -s "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases" |
+                            grep -oE "Armbian_${{ inputs.set_release }}.*/Armbian_.*-trunk_.*.img.gz" |
+                            head -n 1
+                        )"
+
+          [[ -z "${down_filename}" ]] && echo "Invalid download file." && exit 1
           down_file="https://github.com/${GITHUB_REPOSITORY}/releases/download/${down_filename}"
-          [[ -z "${down_file}" ]] && echo "Invalid download file." && exit 1
+
           wget -q -P "${armbian_buildpath}" "${down_file}" && sync
           cd "${armbian_buildpath}" && gzip -df *.img.gz && sync
 

@@ -42,9 +42,10 @@ kernel_path="${compile_path}/kernel"
 config_path="${compile_path}/tools/config"
 script_path="${compile_path}/tools/script"
 out_kernel="${compile_path}/output"
-lasthinker_release_file="/etc/lasthinker-release"
-arch_info="$(arch)"
+arch_info="$(uname -m)"
 host_release="$(cat /etc/os-release | grep '^VERSION_CODENAME=.*' | cut -d"=" -f2)"
+initramfs_conf="/etc/initramfs-tools/update-initramfs.conf"
+lasthinker_release_file="/etc/lasthinker-release"
 
 # Set the default value of the [ -r ] parameter
 # When set to [ -r kernel.org ], Kernel download from kernel.org
@@ -467,13 +468,16 @@ generate_uinitrd() {
     echo -e "${INFO} Backup the files in the [ /boot ] directory."
     boot_backup_path="/boot/backup"
     rm -rf ${boot_backup_path} && mkdir -p ${boot_backup_path}
-    mv -f /boot/{config-*,initrd.img-*,System.map-*,uInitrd-*,vmlinuz-*,uInitrd,zImage,Image} ${boot_backup_path} 2>/dev/null
+    mv -f /boot/{config-*,initrd.img-*,System.map-*,vmlinuz-*,uInitrd*,*Image} ${boot_backup_path} 2>/dev/null
     # Copy /boot related files into armbian system
     cp -f ${kernel_path}/${local_kernel_path}/System.map /boot/System.map-${kernel_outname}
     cp -f ${kernel_path}/${local_kernel_path}/.config /boot/config-${kernel_outname}
     cp -f ${kernel_path}/${local_kernel_path}/arch/arm64/boot/Image /boot/vmlinuz-${kernel_outname}
-    [[ "${PLATFORM}" == "amlogic" ]] && cp -f /boot/vmlinuz-${kernel_outname} /boot/zImage
-    [[ "${PLATFORM}" == "rockchip" ]] && ln -sf vmlinuz-${kernel_outname} /boot/Image
+    if [[ "${PLATFORM}" == "rockchip" || "${PLATFORM}" == "allwinner" ]]; then
+        cp -f /boot/vmlinuz-${kernel_outname} /boot/Image
+    else
+        cp -f /boot/vmlinuz-${kernel_outname} /boot/zImage
+    fi
     #echo -e "${INFO} Kernel copy results in the [ /boot ] directory: \n$(ls -l /boot) \n"
 
     # Backup current system files for /usr/lib/modules
@@ -493,8 +497,14 @@ generate_uinitrd() {
     cd /boot
     echo -e "${STEPS} Generate uInitrd file..."
 
+    # Enable update_initramfs
+    [[ -f "${initramfs_conf}" ]] && sed -i "s|^update_initramfs=.*|update_initramfs=yes|g" ${initramfs_conf}
+
     # Generate uInitrd file directly under armbian system
     update-initramfs -c -k ${kernel_outname} 2>/dev/null
+
+    # Disable update_initramfs
+    [[ -f "${initramfs_conf}" ]] && sed -i "s|^update_initramfs=.*|update_initramfs=no|g" ${initramfs_conf}
 
     if [[ -f uInitrd ]]; then
         echo -e "${SUCCESS} The initrd.img and uInitrd file is Successfully generated."
@@ -597,9 +607,9 @@ loop_recompile() {
     for k in ${build_kernel[*]}; do
         # kernel_version, such as [ 5.10.125 ]
         kernel_version="${k}"
-        # kernel_verpatch, such as [ 5.10 ]
+        # kernel <VERSION> and <PATCHLEVEL>, such as [ 5.10 ]
         kernel_verpatch="$(echo ${kernel_version} | awk -F '.' '{print $1"."$2}')"
-        # kernel_sub, such as [ 125 ]
+        # kernel <SUBLEVEL>, such as [ 125 ]
         kernel_sub="$(echo ${kernel_version} | awk -F '.' '{print $3}')"
 
         # The loop variable assignment
@@ -624,27 +634,32 @@ loop_recompile() {
     done
 }
 
+# Show welcome message
+echo -e "${STEPS} Welcome to compile kernel! \n"
+echo -e "${INFO} Server running on Armbian: [ Release: ${host_release} / Host: ${arch_info} ] \n"
 # Check script permission, supports running on Armbian system.
 [[ "$(id -u)" == "0" ]] || error_msg "Please run this script as root: [ sudo ./${0} ]"
 [[ "${arch_info}" == "aarch64" ]] || error_msg "The script only supports running under Armbian system."
-# Show welcome and server start information
-echo -e "${STEPS} Welcome to compile kernel! \n"
-echo -e "${INFO} Server running on Armbian: [ Release: ${host_release} / Host: ${arch_info} ] \n"
-echo -e "${INFO} Server running path [ ${current_path} ] \n"
+
+# Initialize variables
+init_var "${@}"
+# Check and install the toolchain
+toolchain_check
+# Query the latest kernel version
+[[ "${auto_kernel}" == "true" ]] && query_version
+
+# Show compile settings
+echo -e "${INFO} Kernel compilation toolchain: [ ${toolchain_name} ]"
+echo -e "${INFO} Kernel from: [ ${code_owner} ]"
+echo -e "${INFO} Kernel List: [ $(echo ${build_kernel[*]} | xargs) ] \n"
+# Show server start information
 echo -e "${INFO} Server CPU configuration information: \n$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
 echo -e "${INFO} Server memory usage: \n$(free -h) \n"
 echo -e "${INFO} Server space usage before starting to compile: \n$(df -hT ${current_path}) \n"
-#
-# Initialize variables, download the kernel source code and check the toolchain
-init_var "${@}"
-[[ "${auto_kernel}" == "true" ]] && query_version
-echo -e "${INFO} Kernel compilation toolchain: [ ${toolchain_name} ]"
-echo -e "${INFO} Kernel from: [ ${code_owner} ]"
-echo -e "${INFO} Kernel List: [ $(echo ${build_kernel[*]} | tr "\n" " ") ] \n"
-toolchain_check
+
 # Loop to compile the kernel
 loop_recompile
-#
+
 # Show server end information
 echo -e "${STEPS} Server space usage after compilation: \n$(df -hT ${current_path}) \n"
 echo -e "${SUCCESS} All process completed successfully."

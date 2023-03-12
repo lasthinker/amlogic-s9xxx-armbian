@@ -15,6 +15,9 @@
 #
 #========================= Set default parameters ==========================
 #
+# Set the release check file
+lasthinker_release_file="/etc/lasthinker-release"
+
 # Set font color
 STEPS="[\033[95m STEPS \033[0m]"
 INFO="[\033[94m INFO \033[0m]"
@@ -32,26 +35,34 @@ error_msg() {
 
 # Check disk
 do_checkdisk() {
+    # Check release file
+    [[ -f "${lasthinker_release_file}" ]] || error_msg "missing [ ${lasthinker_release_file} ] file."
+    # Get values
+    source "${lasthinker_release_file}"
+    PLATFORM="${PLATFORM}"
+    [[ -z "${PLATFORM}" ]] && error_msg "Invalid PLATFORM: [ ${PLATFORM} ]"
+
+    # Only the [ amlogic ] box needs manual expansion
+    [[ "${PLATFORM}" != "amlogic" ]] && error_msg "The [ ${PLATFORM} ] box has been expanded without operation."
+
     # Find the partition where root is located
     ROOT_PTNAME="$(df / | tail -n1 | awk '{print $1}' | awk -F '/' '{print $3}')"
-    if [[ -z "${ROOT_PTNAME}" ]]; then
-        error_msg "Cannot find the partition corresponding to the root file system!"
-    fi
+    [[ -z "${ROOT_PTNAME}" ]] && error_msg "Cannot find the partition corresponding to the root file system!"
 
     # Find the disk where the partition is located, only supports mmcblk?p? sd?? hd?? vd?? and other formats
     case "${ROOT_PTNAME}" in
     mmcblk?p[1-4])
-        DISK_NAME="$(echo ${ROOT_PTNAME} | awk '{print substr($1, 1, length($1)-2)}')"
+        DISK_NAME="${ROOT_PTNAME:0:-2}"
         PT_PRE="${DISK_NAME}p"
-        LB_PRE="EMMC_"
+        LB_PRE="MMC_"
         ;;
     [hsv]d[a-z][1-4])
-        DISK_NAME="$(echo ${ROOT_PTNAME} | awk '{print substr($1, 1, length($1)-1)}')"
+        DISK_NAME="${ROOT_PTNAME:0:-1}"
         PT_PRE="${DISK_NAME}"
         LB_PRE="USB_"
         ;;
     nvme?n?p[1-4])
-        DISK_NAME="$(echo ${ROOT_PTNAME} | awk '{print substr($1, 1, length($1)-2)}')"
+        DISK_NAME="${ROOT_PTNAME:0:-2}"
         PT_PRE="${DISK_NAME}p"
         LB_PRE="NVME_"
         ;;
@@ -59,19 +70,23 @@ do_checkdisk() {
         error_msg "${ERROR} Unable to recognize the disk type of ${ROOT_PTNAME}!"
         ;;
     esac
+
+    # Check the current system running disk
+    run_on_emmc="$(lsblk -l -o NAME | grep -oE "^${DISK_NAME}boot0")"
+    [[ -n "${run_on_emmc}" ]] && error_msg "You run on eMMC, no partition required."
 }
 
 # Create new partition
 create_new_part() {
-    echo -e "${STEPS} Start creating a new partition ... "
+    echo -e "${STEPS} Start creating a new partition..."
 
     # Set the type of file system
     cat <<EOF
 -----------------------------------------------
-ID  TYPE
+ ID  TYPE
 -----------------------------------------------
-1   ext4
-2   btrfs
+ 1   ext4
+ 2   btrfs
 -----------------------------------------------
 EOF
     echo -ne "${OPTIONS} Please Input ID: "
@@ -87,43 +102,35 @@ EOF
     echo -e "${INFO} The type of file system: [ ${file_system_type} ]"
 
     # Confirm UUID
+    echo -e "${STEPS} Start generating new partition UUID..."
     ROOTFS_UUID="$(cat /proc/sys/kernel/random/uuid)"
     [[ -z "${ROOTFS_UUID}" ]] && ROOTFS_UUID="$(uuidgen)"
     [[ -z "${ROOTFS_UUID}" ]] && error_msg "The uuidgen is invalid, cannot continue."
     echo -e "${INFO} ROOTFS_UUID: ${ROOTFS_UUID}"
 
-    # Get the starting position of the p3 partition
-    START_P3="$(fdisk -l | grep "${ROOT_PTNAME}" | sed -n '$p' | awk '{print $3}' | echo $(($(xargs) + 1)))"
-    if [[ -z "${START_P3}" || -z "$(echo ${START_P3} | sed -n "/^[0-9]\+$/p")" ]]; then
-        error_msg "Unable to get starting position!"
-    fi
-    TOTAL_SIZE="$(lsblk -l -b -o NAME,SIZE | awk "\$1 ~ /^${DISK_NAME}\$/ {print \$2}")"
-    END_P3="$((TOTAL_SIZE / 512 - 1))"
+    # Repair disk size
+    echo -e "${STEPS} Start repairing hard disk size..."
+    printf 'f\n' | parted ---pretend-input-tty /dev/${DISK_NAME} print || repair_status="no"
+    [[ "${repair_status}" == "no" ]] && error_msg "Disk size repair failed, stop partitioning."
 
-    cat >/tmp/fdisk.script <<EOF
-n
-p
-3
-${START_P3}
-${END_P3}
-Y
-t
-3
-83
-w
-EOF
-    sync
+    # Calculate partition positions
+    echo -e "${STEPS} Start calculating partition location..."
+    END_P2="$(fdisk -l | grep "${ROOT_PTNAME}" | sed -n '$p' | awk '{print $3}' | xargs)"
+    [[ -z "${END_P2}" || -z "$(echo ${END_P2} | sed -n "/^[0-9]\+$/p")" ]] && error_msg "Unable to get starting position!"
+    START_P3="$(((END_P2 + 1) / 2048 + 1))"
 
-    echo -e "${STEPS} Fdisk starting ... "
-    fdisk /dev/${DISK_NAME} </tmp/fdisk.script 2>/dev/null
-    [[ "$?" -ne "0" ]] && error_msg "Fdisk failed!"
-    sync
+    # Create the partition
+    echo -e "${STEPS} Start creating new partitions..."
+    parted /dev/${DISK_NAME} mkpart primary ${file_system_type} $((START_P3))MiB 100% 2>/dev/null
+    # Show partition results
+    parted /dev/${DISK_NAME} unit MiB print
 
-    echo -e "${STEPS} Create data filesystem ... "
+    echo -e "${STEPS} Create data filesystem..."
     # Set mount path
     data_path="/data"
     mkdir -p ${data_path} && sync
 
+    umount -f /dev/${PT_PRE}3 2>/dev/null
     if [[ "${file_system_type}" == "btrfs" ]]; then
         mkfs.btrfs -f -U ${ROOTFS_UUID} -L "${LB_PRE}DATA" -m single "/dev/${PT_PRE}3"
         [[ "${?}" -eq "0" ]] || error_msg "Failed to format using [ mkfs.btrfs ]"
@@ -147,18 +154,18 @@ EOF
 
 # Expand the current partition
 expand_current_part() {
-    echo -e "${STEPS} Start to expand the current partition ... "
+    echo -e "${STEPS} Start to expand the current partition..."
 
-    echo -e "${STEPS} Install growpart or xfsprogs expansion and formatting tool ... "
+    echo -e "${STEPS} Install growpart or xfsprogs expansion and formatting tool..."
     apt-get update
     apt-get install cloud-guest-utils xfsprogs -y
     [[ "${?}" -ne "0" ]] && error_msg "Dependency installation failed."
 
-    echo -e "${STEPS} Expansion Partition ... "
+    echo -e "${STEPS} Expansion Partition..."
     growpart /dev/${DISK_NAME} 2
     [[ "${?}" -ne "0" ]] && error_msg "[ growpart ] operation failed."
 
-    echo -e "${STEPS} Expansion file system ... "
+    echo -e "${STEPS} Expansion file system..."
     ROOTFS_TYPE="$(df -hT / | grep "/" | awk '{print $2}')"
     if [[ "${ROOTFS_TYPE}" == "btrfs" ]]; then
         btrfs filesystem resize max /
@@ -177,13 +184,24 @@ expand_current_part() {
 echo -e "${STEPS} Welcome to use TF/SD/USB partition management tool."
 # Check script permission
 [[ "$(id -u)" == "0" ]] || error_msg "please run this script as root: [ sudo $0 ]"
+
 # Check disk
 do_checkdisk
+
 # Prompt the user to select Expand/Create
-echo -ne "${OPTIONS} Do you want to Expand=(e) or Create=(c) partitions? (e/c): "
+cat <<EOF
+--------------------------------------------------
+  Option  Function
+--------------------------------------------------
+    e     :Expand the remaining available space
+    c     :Create a third new partition
+--------------------------------------------------
+EOF
+echo -ne "${OPTIONS} Please select (e/c): "
 read ec
+
 case "${ec}" in
-    e | E | expand) expand_current_part ;;
-    c | C | create) create_new_part ;;
-    *)              exit 0 ;;
+e | E | expand) expand_current_part ;;
+c | C | create) create_new_part ;;
+*) exit 0 ;;
 esac

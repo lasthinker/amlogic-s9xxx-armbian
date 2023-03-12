@@ -28,15 +28,17 @@
 #========================================= Functions list =========================================
 #
 # error_msg          : Output error message
+#
 # check_depends      : Check dependencies
 # get_textoffset     : Get kernel TEXT_OFFSET
 # init_var           : Initialize all variables
-# rescue_kernel      : Rescue the kernel
 # download_kernel    : Download the kernel
 # check_kernel       : Check kernel files list
 # backup_kernel      : Backup current kernel
 # update_kernel      : Update the kernel
 # update_uboot       : Update the uboot
+#
+# rescue_kernel      : Rescue the kernel
 #
 #===================================== Set default parameters =====================================
 #
@@ -44,6 +46,7 @@
 current_path="${PWD}"
 # Set kernel backup directory
 backup_path="/ddbr/backup"
+auto_backup_kernel="yes"
 # Set kernel rescue temporary directory
 rescue_path="/ddbr/rescue"
 # Set the release check file
@@ -76,7 +79,7 @@ check_depends() {
     echo -e "${STEPS} Start checking dependencies..."
 
     is_missing="0"
-    necessary_packages=("subversion" "tar" "coreutils")
+    necessary_packages=("subversion" "tar" "coreutils" "bsdextrautils")
     i="1"
     for package in ${necessary_packages[*]}; do
         [[ -n "$(dpkg -l | awk '{print $2}' | grep -w "^${package}$" 2>/dev/null)" ]] || is_missing="1"
@@ -124,10 +127,9 @@ init_var() {
     BOOTLOADER_IMG="${BOOTLOADER_IMG}"
     KERNEL_BRANCH="${KERNEL_BRANCH}"
     [[ -z "${PLATFORM}" ]] && error_msg "Invalid PLATFORM: [ ${PLATFORM} ]"
-    echo -e "${INFO} Armbian PLATFORM: [ ${PLATFORM} ]"
 
     # If it is followed by [ : ], it means that the option requires a parameter value
-    get_all_ver="$(getopt "k:v:m:" "${@}")"
+    get_all_ver="$(getopt "k:v:m:b:" "${@}")"
 
     while [[ -n "${1}" ]]; do
         case "${1}" in
@@ -155,6 +157,14 @@ init_var() {
                 error_msg "Invalid -m parameter [ ${2} ]!"
             fi
             ;;
+        -b | --Backup_kenlel)
+            if [[ -n "${2}" ]]; then
+                [[ "${2}" == "no" ]] && auto_backup_kernel="no" || auto_backup_kernel="yes"
+                shift
+            else
+                error_msg "Invalid -b parameter [ ${2} ]!"
+            fi
+            ;;
         *)
             error_msg "Invalid option [ ${1} ]!"
             ;;
@@ -166,8 +176,6 @@ init_var() {
     [[ -z "${KERNEL_BRANCH}" ]] && {
         if [[ "${SOC,,}" == "rk3588" ]]; then
             KERNEL_BRANCH="rk3588"
-        elif [[ "${SOC,,}" == "s905w" ]]; then
-            KERNEL_BRANCH="5.15.y"
         elif [[ "${SOC,,}" == "rk3568" || "${SOC,,}" == "rk3399" ]]; then
             KERNEL_BRANCH="6.1.y"
         else
@@ -176,22 +184,24 @@ init_var() {
         echo "KERNEL_BRANCH='${KERNEL_BRANCH}'" >>${lasthinker_release_file}
     }
 
-    # Set kernel download directory [ 5.15.y/6.x.y ] to [ stable ]
+    # Set kernel download directory
     if [[ "${KERNEL_BRANCH}" == "rk3588" ]]; then
-        kernel_down="rk3588"
+        kernel_download_dir="rk3588"
     elif [[ "${KERNEL_BRANCH}" == "dev" ]]; then
-        kernel_down="dev"
+        kernel_download_dir="dev"
     else
-        kernel_down="stable"
+        kernel_download_dir="stable"
     fi
 
     # Display settings results
-    echo -e "${INFO} Set the kernel download directory: [ ${kernel_down} ]"
-    echo -e "${INFO} Set the kernel name: [ ${inputs_kernel} ]"
+    echo -e "${INFO} Armbian PLATFORM: [ ${PLATFORM} ]"
+    echo -e "${INFO} Kernel branch: [ ${KERNEL_BRANCH} ]"
+    echo -e "${INFO} Kernel download directory: [ ${kernel_download_dir} ]"
+    echo -e "${INFO} Kernel name: [ ${inputs_kernel} ]"
 
     # Convert kernel library address to svn format
     [[ "${kernel_repo}" == http* && -n "$(echo "${kernel_repo}" | grep "tree/main")" ]] && kernel_repo="${kernel_repo//tree\/main/trunk}"
-    kernel_repo="${kernel_repo}/${kernel_down}"
+    kernel_repo="${kernel_repo}/${kernel_download_dir}"
 
     # Convert kernel library address to API format
     kernel_api="${kernel_repo#*com\/}"
@@ -205,91 +215,19 @@ init_var() {
     # Find the disk where the partition is located, only supports mmcblk?p? sd?? hd?? vd?? and other formats
     case "${ROOT_PTNAME}" in
     mmcblk?p[1-4])
-        EMMC_NAME="$(echo ${ROOT_PTNAME} | awk '{print substr($1, 1, length($1)-2)}')"
+        DISK_NAME="${ROOT_PTNAME:0:-2}"
         ;;
     [hsv]d[a-z][1-4])
-        EMMC_NAME="$(echo ${ROOT_PTNAME} | awk '{print substr($1, 1, length($1)-1)}')"
+        DISK_NAME="${ROOT_PTNAME:0:-1}"
         ;;
     nvme?n?p[1-4])
-        EMMC_NAME="$(echo ${ROOT_PTNAME} | awk '{print substr($1, 1, length($1)-2)}')"
+        DISK_NAME="${ROOT_PTNAME:0:-2}"
         ;;
     *)
         error_msg "Unable to recognize the disk type of ${ROOT_PTNAME}!"
         ;;
     esac
-    DEV_EMMC="/dev/${EMMC_NAME}"
-
-    sync && echo ""
-}
-
-# Rescue the kernel
-rescue_kernel() {
-    echo -e "${STEPS} Start rescuing kernel files..."
-
-    # Check the current system running disk
-    root_devname="$(df / | tail -n1 | awk '{print $1}' | awk -F '/' '{print substr($3, 1, length($3)-2)}')"
-    if lsblk -l | grep -E "^${root_devname}boot0" >/dev/null; then
-        error_msg "You are running in eMMC mode, please boot system with usb or tf card!"
-    fi
-
-    # Find emmc disk, first find emmc containing boot0 partition
-    box_disk="$(lsblk -l -o NAME | grep -oE '(mmcblk[0-9]?boot0)' | sed "s/boot0//g")"
-    # Find emmc disk, find emmc that does not contain the boot0 partition
-    [[ -z "${box_disk}" ]] && box_disk="$(lsblk -l -o NAME | grep -oE '(mmcblk[0-9]?)' | grep -vE ^${root_devname} | sort | uniq)"
-    # Find NVMe disk
-    [[ -z "${box_disk}" ]] && box_disk="$(lsblk -l -o NAME | grep -oE '(nvme0n1)' | grep -vE ^${root_devname} | sort | uniq)"
-    # Check if emmc exists
-    [[ -z "${box_disk}" ]] && error_msg "The eMMC/NVMe storage not found in this device!"
-    # Location of disk
-    rescue_disk="/dev/${box_disk}"
-    echo -e "${INFO} The device eMMC/NVMe name: [ ${rescue_disk} ]"
-
-    # Check if there is enough free space
-    available_space="$(df -Tk / | grep '/dev/' | awk '{print $5}' | echo $(($(xargs) / 1024 / 1024)))"
-    [[ -z "$(echo "${available_space}" | sed -n "/^[0-9]\+$/p")" ]] && error_msg "The remaining space cannot be obtained."
-    [[ "${available_space}" -lt "3" ]] && error_msg "The available space is less than 3GiB, please use [ armbian-tf ] to expand the USB."
-
-    # Create a temporary mount directory
-    rm -rf ${rescue_path}
-    mkdir -p ${rescue_path}/{bootfs/,rootfs/}
-
-    # Mount eMMC to USB
-    mount ${rescue_disk}p1 ${rescue_path}/bootfs
-    [[ "${?}" -ne "0" ]] && error_msg "mount ${rescue_disk}p1 failed!"
-    mount ${rescue_disk}p2 ${rescue_path}/rootfs
-    [[ "${?}" -ne "0" ]] && error_msg "mount ${rescue_disk}p2 failed!"
-
-    # Identify the current kernel files
-    kernel_signature="$(uname -r)"
-
-    # 01. For /boot files
-    cd ${rescue_path}/bootfs
-    rm -rf config-* initrd.img-* System.map-* vmlinuz-* uInitrd* *Image dtb*
-    [[ "${PLATFORM}" == "amlogic" ]] && cp -rf /boot/{u-boot.ext,u-boot.emmc} -t . 2>/dev/null
-    cp -rf /boot/{*-${kernel_signature},uInitrd,*Image,dtb} -t .
-    [[ "${?}" -ne "0" ]] && error_msg "(1/3) [ boot ] kernel files rescue failed."
-    echo -e "${INFO} (1/3) [ boot ] kernel files rescue succeeded."
-
-    # 02. For /usr/lib/modules/${kernel_signature}
-    cd ${rescue_path}/rootfs/usr/lib/modules
-    rm -rf *
-    cp -rf /usr/lib/modules/${kernel_signature} -t .
-    [[ "${?}" -ne "0" ]] && error_msg "(2/3) [ modules ] kernel files rescue failed."
-    echo -e "${INFO} (2/3) [ modules ] kernel files rescue succeeded."
-
-    # 03. For /usr/src/linux-headers-${kernel_signature}
-    cd ${rescue_path}/rootfs/usr/src
-    rm -rf linux-headers-*
-    cp -rf /usr/src/linux-headers-${kernel_signature} -t .
-    [[ "${?}" -ne "0" ]] && error_msg "(3/3) [ headers ] kernel files rescue failed."
-    echo -e "${INFO} (3/3) [ headers ] kernel files rescue succeeded."
-
-    # Unmount the emmc partition
-    cd ${rescue_path}
-    umount -f ${rescue_path}/bootfs
-    [[ "${?}" -ne "0" ]] && error_msg "Failed to umount [ ${rescue_path}/bootfs ]"
-    umount -f ${rescue_path}/rootfs
-    [[ "${?}" -ne "0" ]] && error_msg "Failed to umount [ ${rescue_path}/rootfs ]"
+    echo -e "${INFO} Armbian running: [ /dev/${DISK_NAME} ]."
 
     sync && echo ""
 }
@@ -354,9 +292,10 @@ check_kernel() {
     echo -e "${STEPS} Start checking the kernel..."
 
     # Check for inapplicable kernels
-    if { [[ "${SOC,,}" == "s905w" ]] && [[ "${inputs_kernel:0:5}" != "5.15." && "${inputs_kernel:0:4}" != "5.4." ]]; } ||
-        { [[ "${SOC,,}" == "rk3568" || "${SOC,,}" == "rk3399" ]] && [[ "${inputs_kernel:0:2}" != "6." ]]; } ||
-        { [[ "${SOC,,}" == "rk3588" && "${inputs_kernel:0:5}" != "5.10." ]]; }; then
+    if { [[ "${KERNEL_BRANCH}" == "rk3588" ]] && [[ "${inputs_kernel:0:5}" != "5.10." ]]; } ||
+        { [[ "${KERNEL_BRANCH}" == "6.x.y" ]] && [[ "${inputs_kernel:0:2}" != "6." ]]; } ||
+        { [[ "${KERNEL_BRANCH}" == "5.10.y" ]] && [[ "${inputs_kernel:0:5}" != "5.10." ]]; } ||
+        { [[ "${KERNEL_BRANCH}" == "5.15.y" ]] && [[ "${inputs_kernel:0:5}" != "5.15." && "${inputs_kernel:0:4}" != "5.4." ]]; }; then
         error_msg "Kernel [ ${inputs_kernel} ] is not available for this device."
     fi
 
@@ -406,8 +345,16 @@ check_kernel() {
 backup_kernel() {
     echo -e "${STEPS} Start backing up the current kernel..."
 
-    # Identify the current kernel files
+    [[ -d "${backup_path}" ]] || mkdir -p ${backup_path}
     rm -rf ${backup_path}/${current_kernel}
+
+    # Keep the latest 3 kernel backups and delete the others
+    backup_kernel_list=($(ls ${backup_path} -lt | grep "^d" | awk '{print $9}'))
+    [[ "${#backup_kernel_list[*]}" -ge "3" ]] && {
+        for ((i = 2; i < ${#backup_kernel_list[*]}; i++)); do rm -rf ${backup_path}/${backup_kernel_list[$i]}; done
+    }
+
+    # Identify the current kernel files
     mkdir -p ${backup_path}/${current_kernel}
 
     # Create temporary file directory
@@ -455,7 +402,7 @@ backup_kernel() {
     # Add sha256sum integrity verification file
     cd ${backup_path}/${current_kernel}
     sha256sum * >sha256sums
-    echo -e "${INFO} The [ sha256sums ] file has been generated"
+    echo -e "${INFO} The [ sha256sums ] file has been generated."
     echo -e "${INFO} The current kernel backup path: [ ${backup_path}/${current_kernel} ]. It can be deleted if it is not needed."
 
     sync && echo ""
@@ -474,11 +421,12 @@ update_kernel() {
     tar -xzf boot-${kernel_name}.tar.gz -C /boot
     [[ "${PLATFORM}" == "amlogic" ]] && (cd /boot && cp -f uInitrd-${kernel_name} uInitrd && cp -f vmlinuz-${kernel_name} zImage)
     [[ "${PLATFORM}" == "rockchip" ]] && (cd /boot && ln -sf uInitrd-${kernel_name} uInitrd && ln -sf vmlinuz-${kernel_name} Image)
+    [[ "${PLATFORM}" == "allwinner" ]] && (cd /boot && cp -f uInitrd-${kernel_name} uInitrd && cp -f vmlinuz-${kernel_name} Image)
     [[ "$(ls /boot/*${kernel_name}* -l 2>/dev/null | grep "^-" | wc -l)" -ge "4" ]] || error_msg "The /boot files is missing."
     echo -e "${INFO} (1/4) Unpacking [ boot-${kernel_name}.tar.gz ] done."
 
     # 02. For /boot/dtb/${PLATFORM}/*
-    mkdir -p /boot/dtb/${PLATFORM}
+    [[ -d "/boot/dtb/${PLATFORM}" ]] || mkdir -p /boot/dtb/${PLATFORM}
     tar -xzf dtb-${PLATFORM}-${kernel_name}.tar.gz -C /boot/dtb/${PLATFORM}
     [[ "${PLATFORM}" == "rockchip" ]] && ln -sf dtb /boot/dtb-${kernel_name}
     [[ "$(ls /boot/dtb/${PLATFORM} -l 2>/dev/null | grep "^-" | wc -l)" -ge "2" ]] || error_msg "/boot/dtb/${PLATFORM} files is missing."
@@ -513,23 +461,93 @@ update_uboot() {
     echo -e "${STEPS} Start updating the uboot..."
 
     # Copy u-boot.ext and u-boot.emmc
-    if [[ "${NEED_OVERLOAD}" == "yes" || "${auto_mainline_uboot}" == "yes" ]] && [[ -n "${UBOOT_OVERLOAD}" && -f "/boot/${UBOOT_OVERLOAD}" ]]; then
-        [[ ! -f "/boot/u-boot.ext" ]] && cp -f "/boot/${UBOOT_OVERLOAD}" /boot/u-boot.ext && chmod +x /boot/u-boot.ext
-        [[ ! -f "/boot/u-boot.emmc" ]] && cp -f "/boot/u-boot.ext" /boot/u-boot.emmc && chmod +x /boot/u-boot.emmc
-        echo -e "${INFO} The ${UBOOT_OVERLOAD} file copy is complete."
+    if [[ "${NEED_OVERLOAD}" == "yes" && -n "${UBOOT_OVERLOAD}" && -f "/boot/${UBOOT_OVERLOAD}" ]]; then
+        echo -e "${INFO} Copy u-boot: [ ${UBOOT_OVERLOAD} ]"
+        run_on_emmc="$(lsblk -l -o NAME | grep -oE "^${DISK_NAME}boot0")"
+        [[ ! -f "/boot/u-boot.ext" ]] && cp -f /boot/${UBOOT_OVERLOAD} /boot/u-boot.ext
+        [[ ! -f "/boot/u-boot.emmc" && -n "${run_on_emmc}" ]] && cp -f /boot/u-boot.ext /boot/u-boot.emmc
+        chmod +x /boot/u-boot.*
     fi
 
-    # Write bootloader
-    if [[ -n "${MAINLINE_UBOOT}" && -f "${MAINLINE_UBOOT}" && "${auto_mainline_uboot}" == "yes" ]]; then
+    # Write mainline u-boot
+    if [[ "${auto_mainline_uboot}" == "yes" && -n "${MAINLINE_UBOOT}" && -f "${MAINLINE_UBOOT}" ]]; then
         echo -e "${INFO} Write Mainline u-boot: [ ${MAINLINE_UBOOT} ]"
-        dd if="${MAINLINE_UBOOT}" of="${DEV_EMMC}" conv=fsync bs=1 count=444 2>/dev/null
-        dd if="${MAINLINE_UBOOT}" of="${DEV_EMMC}" conv=fsync bs=512 skip=1 seek=1 2>/dev/null
-    elif [[ -n "${BOOTLOADER_IMG}" && -f "${BOOTLOADER_IMG}" ]]; then
-        echo -e "${INFO} Write bootloader: [ ${BOOTLOADER_IMG} ]"
-        dd if="${BOOTLOADER_IMG}" of="${DEV_EMMC}" conv=fsync bs=1 count=444 2>/dev/null
-        dd if="${BOOTLOADER_IMG}" of="${DEV_EMMC}" conv=fsync bs=512 skip=1 seek=1 2>/dev/null
+        dd if="${MAINLINE_UBOOT}" of="/dev/${DISK_NAME}" conv=fsync bs=1 count=444 2>/dev/null
+        dd if="${MAINLINE_UBOOT}" of="/dev/${DISK_NAME}" conv=fsync bs=512 skip=1 seek=1 2>/dev/null
     fi
     [[ "${?}" -ne "0" ]] && error_msg "Failed to write bootloader using [ dd ]."
+
+    sync && echo ""
+}
+
+# Rescue the kernel
+rescue_kernel() {
+    echo -e "${STEPS} Start rescuing kernel files..."
+
+    # Check the current system running disk
+    root_devname="$(df / | tail -n1 | awk '{print $1}' | awk -F '/' '{print substr($3, 1, length($3)-2)}')"
+    if lsblk -l | grep -E "^${root_devname}boot0" >/dev/null; then
+        error_msg "You are running in eMMC mode, please boot system with usb or tf card!"
+    fi
+
+    # Find emmc disk, first find emmc containing boot0 partition
+    box_disk="$(lsblk -l -o NAME | grep -oE '(mmcblk[0-9]?boot0)' | sed "s/boot0//g")"
+    # Find emmc disk, find emmc that does not contain the boot0 partition
+    [[ -z "${box_disk}" ]] && box_disk="$(lsblk -l -o NAME | grep -oE '(mmcblk[0-9]?)' | grep -vE ^${root_devname} | sort | uniq)"
+    # Find NVMe disk
+    [[ -z "${box_disk}" ]] && box_disk="$(lsblk -l -o NAME | grep -oE '(nvme0n1)' | grep -vE ^${root_devname} | sort | uniq)"
+    # Check if emmc exists
+    [[ -z "${box_disk}" ]] && error_msg "The eMMC/NVMe storage not found in this device!"
+    # Location of disk
+    rescue_disk="/dev/${box_disk}"
+    echo -e "${INFO} The device eMMC/NVMe name: [ ${rescue_disk} ]"
+
+    # Check if there is enough free space
+    available_space="$(df -Tk / | grep '/dev/' | awk '{print $5}' | echo $(($(xargs) / 1024 / 1024)))"
+    [[ -z "$(echo "${available_space}" | sed -n "/^[0-9]\+$/p")" ]] && error_msg "The remaining space cannot be obtained."
+    [[ "${available_space}" -lt "5" ]] && error_msg "The available space is less than 5GiB, please use [ armbian-tf ] to expand the USB."
+
+    # Create a temporary mount directory
+    rm -rf ${rescue_path}
+    mkdir -p ${rescue_path}/{bootfs/,rootfs/}
+
+    # Mount eMMC to USB
+    mount ${rescue_disk}p1 ${rescue_path}/bootfs
+    [[ "${?}" -ne "0" ]] && error_msg "mount ${rescue_disk}p1 failed!"
+    mount ${rescue_disk}p2 ${rescue_path}/rootfs
+    [[ "${?}" -ne "0" ]] && error_msg "mount ${rescue_disk}p2 failed!"
+
+    # Identify the current kernel files
+    kernel_signature="$(uname -r)"
+
+    # 01. For /boot files
+    cd ${rescue_path}/bootfs
+    rm -rf config-* initrd.img-* System.map-* vmlinuz-* uInitrd* *Image dtb*
+    [[ "${PLATFORM}" == "amlogic" ]] && cp -rf /boot/{u-boot.ext,u-boot.emmc} -t . 2>/dev/null
+    cp -rf /boot/{*-${kernel_signature},uInitrd,*Image,dtb} -t .
+    [[ "${?}" -ne "0" ]] && error_msg "(1/3) [ boot ] kernel files rescue failed."
+    echo -e "${INFO} (1/3) [ boot ] kernel files rescue succeeded."
+
+    # 02. For /usr/lib/modules/${kernel_signature}
+    cd ${rescue_path}/rootfs/usr/lib/modules
+    rm -rf *
+    cp -rf /usr/lib/modules/${kernel_signature} -t .
+    [[ "${?}" -ne "0" ]] && error_msg "(2/3) [ modules ] kernel files rescue failed."
+    echo -e "${INFO} (2/3) [ modules ] kernel files rescue succeeded."
+
+    # 03. For /usr/src/linux-headers-${kernel_signature}
+    cd ${rescue_path}/rootfs/usr/src
+    rm -rf linux-headers-*
+    cp -rf /usr/src/linux-headers-${kernel_signature} -t .
+    [[ "${?}" -ne "0" ]] && error_msg "(3/3) [ headers ] kernel files rescue failed."
+    echo -e "${INFO} (3/3) [ headers ] kernel files rescue succeeded."
+
+    # Unmount the emmc partition
+    cd ${rescue_path}
+    umount -f ${rescue_path}/bootfs
+    [[ "${?}" -ne "0" ]] && error_msg "Failed to umount [ ${rescue_path}/bootfs ]"
+    umount -f ${rescue_path}/rootfs
+    [[ "${?}" -ne "0" ]] && error_msg "Failed to umount [ ${rescue_path}/rootfs ]"
 
     sync && echo ""
 }
@@ -538,19 +556,26 @@ update_uboot() {
 [[ "$(id -u)" == "0" ]] || error_msg "Please run this script as root: [ sudo $0 ]"
 echo -e "${STEPS} Welcome to the kernel update tool."
 
-if [[ "${1}" == "-r" ]]; then
-    rescue_kernel
-else
+# Update or Rescue kernel
+if [[ "${1}" != "-r" ]]; then
+    # Start updating the kernel
     check_depends
     init_var "${@}"
     download_kernel
     check_kernel
-    backup_kernel
+    [[ "${auto_backup_kernel}" == "yes" ]] && backup_kernel
     update_kernel
     [[ "${PLATFORM}" == "amlogic" ]] && update_uboot
-fi
 
-sync && sleep 3
-echo -e "${SUCCESS} Successfully updated, automatic restarting..."
-reboot
-exit 0
+    # Kernel updated successfully
+    sync && sleep 3
+    echo -e "${SUCCESS} Successfully updated, automatic restarting..."
+    reboot
+else
+    # Start rescuing kernel
+    rescue_kernel
+
+    # Kernel rescue succeeded
+    sync && sleep 3
+    echo -e "${SUCCESS} The kernel rescue is successful, please unplug the USB and reboot the Armbian."
+fi

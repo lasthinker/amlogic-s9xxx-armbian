@@ -12,10 +12,10 @@
 # Copyright (C) 2022- https://github.com/lasthinker/amlogic-s9xxx-armbian
 #
 # Function          : Command
-# Default           : armbain-led
-# One-key to open   : armbian-led <boxid>
-# One-key to stop   : armbian-led 0
-# Update config     : armbian-led -u
+# Default           : armbian-openvfd
+# One-key to open   : armbian-openvfd <boxid>
+# One-key to stop   : armbian-openvfd 0
+# Update config     : armbian-openvfd -u
 #
 #============================= Functions list =============================
 #
